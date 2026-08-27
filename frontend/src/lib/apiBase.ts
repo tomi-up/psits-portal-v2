@@ -7,11 +7,13 @@ export const API = import.meta.env.PROD
   : '/api/v1'
 
 // Same origin split applies to the WebSocket used for live attendance
-// updates - derive its ws(s):// origin from API instead of the page's own
-// location, which in production is the Vercel frontend, not the backend.
+// updates. `path` is expected to already include the API prefix (e.g.
+// `${API}/events/.../ws`) - in dev that's relative ('/api/v1/...'), resolved
+// against the page's own origin; in prod it's already absolute (the Render
+// backend's URL), so the base argument below is ignored. Either way we just
+// flip the resolved URL's http(s) scheme to ws(s).
 export function apiWebSocketUrl(path: string): string {
-  const httpOrigin = import.meta.env.PROD
-    ? new URL(API).origin
-    : window.location.origin
-  return httpOrigin.replace(/^http/, 'ws') + path
+  const url = new URL(path, window.location.href)
+  url.protocol = url.protocol.replace('http', 'ws')
+  return url.toString()
 }

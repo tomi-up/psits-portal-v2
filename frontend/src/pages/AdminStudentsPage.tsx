@@ -215,7 +215,7 @@ export default function AdminStudentsPage() {
                       <th className="px-5 py-3">
                         <button
                           onClick={() => toggleSort('student_id')}
-                          className="flex items-center gap-1 hover:text-slate-700"
+                          className="flex items-center gap-1 uppercase tracking-wide hover:text-slate-700"
                         >
                           Student ID <ArrowUpDown className="h-3 w-3" />
                         </button>
@@ -223,7 +223,7 @@ export default function AdminStudentsPage() {
                       <th className="px-5 py-3">
                         <button
                           onClick={() => toggleSort('name')}
-                          className="flex items-center gap-1 hover:text-slate-700"
+                          className="flex items-center gap-1 uppercase tracking-wide hover:text-slate-700"
                         >
                           Name <ArrowUpDown className="h-3 w-3" />
                         </button>

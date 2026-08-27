@@ -264,7 +264,7 @@ export default function StudentEventsPage() {
                       <th className="px-5 py-3">
                         <button
                           onClick={() => toggleSort('name')}
-                          className="flex items-center gap-1 hover:text-slate-700"
+                          className="flex items-center gap-1 uppercase tracking-wide hover:text-slate-700"
                         >
                           Event <ArrowUpDown className="h-3 w-3" />
                         </button>
@@ -272,7 +272,7 @@ export default function StudentEventsPage() {
                       <th className="px-5 py-3">
                         <button
                           onClick={() => toggleSort('event_date')}
-                          className="flex items-center gap-1 hover:text-slate-700"
+                          className="flex items-center gap-1 uppercase tracking-wide hover:text-slate-700"
                         >
                           Date <ArrowUpDown className="h-3 w-3" />
                         </button>

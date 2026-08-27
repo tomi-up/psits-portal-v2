@@ -440,7 +440,7 @@ export default function AdminEventRegistrationsPage() {
                         <th className="px-5 py-3">
                           <button
                             onClick={() => toggleSort('student_name')}
-                            className="flex items-center gap-1 hover:text-slate-700"
+                            className="flex items-center gap-1 uppercase tracking-wide hover:text-slate-700"
                           >
                             Student <ArrowUpDown className="h-3 w-3" />
                           </button>
@@ -449,7 +449,7 @@ export default function AdminEventRegistrationsPage() {
                         <th className="px-5 py-3">
                           <button
                             onClick={() => toggleSort('time_in')}
-                            className="flex items-center gap-1 hover:text-slate-700"
+                            className="flex items-center gap-1 uppercase tracking-wide hover:text-slate-700"
                           >
                             Time In <ArrowUpDown className="h-3 w-3" />
                           </button>
