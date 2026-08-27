@@ -6,6 +6,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
+import os
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -51,16 +52,28 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)
 
-    # Security Middleware. TrustedHostMiddleware matches the bare hostname from
-    # the Host header (e.g. "psits.local"), never a full URL - feeding it
-    # scheme-prefixed CORS origins (e.g. "https://psits.local") means they can
-    # never match, so every request to a real deployed domain would 400 with
-    # "Invalid host header" once CORS_ORIGINS pointed at it. Strip each origin
-    # down to its hostname before using it here.
+    # Security Middleware. TrustedHostMiddleware checks the bare hostname the
+    # REQUEST CLAIMS TO BE SERVED FROM (the Host header) - that's a different
+    # thing from CORS_ORIGINS, which is who's allowed to CALL this API (the
+    # frontend's domain). Deriving allowed_hosts from CORS_ORIGINS alone left
+    # the backend's own domain out entirely, so Render's health checks and
+    # every real request 400'd with "Invalid host header" the moment this
+    # deployed - add the platform-provided hostname (Render sets
+    # RENDER_EXTERNAL_HOSTNAME automatically; harmless no-op anywhere else).
+    #
+    # TrustedHostMiddleware matches the bare hostname (e.g. "psits.local"),
+    # never a full URL - feeding it scheme-prefixed origins (e.g.
+    # "https://psits.local") means they can never match, so also strip each
+    # CORS origin down to its hostname before using it here.
     cors_hostnames = [urlparse(origin).hostname for origin in settings.cors_origins_list]
+    render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1", "0.0.0.0"] + [h for h in cors_hostnames if h]
+        allowed_hosts=(
+            ["localhost", "127.0.0.1", "0.0.0.0"]
+            + [h for h in cors_hostnames if h]
+            + ([render_hostname] if render_hostname else [])
+        )
     )
 
     # CORS Middleware
