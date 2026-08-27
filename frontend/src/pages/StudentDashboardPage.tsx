@@ -9,6 +9,7 @@ import RegistrationNotice from '@/components/RegistrationNotice'
 import EmptyState from '@/components/EmptyState'
 import { getStudentSidebarItems } from '@/lib/studentNav'
 import { studentFetch } from '@/lib/studentAuth'
+import { API } from '@/lib/apiBase'
 
 interface DashboardData {
   student: {
@@ -42,7 +43,6 @@ interface EventItem {
   is_checked_out: boolean
 }
 
-const API = '/api/v1'
 
 export default function StudentDashboardPage() {
   const navigate = useNavigate()

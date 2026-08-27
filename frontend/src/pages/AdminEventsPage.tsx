@@ -19,6 +19,7 @@ import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import EmptyState from '@/components/EmptyState'
 import { adminFetch } from '@/lib/adminAuth'
+import { API } from '@/lib/apiBase'
 
 interface EventItem {
   id: string
@@ -33,7 +34,6 @@ interface EventItem {
   created_at: string
 }
 
-const API = '/api/v1'
 
 type SortKey = 'name' | 'event_date'
 

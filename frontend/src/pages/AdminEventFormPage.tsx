@@ -8,6 +8,7 @@ import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import DatePicker from '@/components/DatePicker'
 import { adminFetch } from '@/lib/adminAuth'
+import { API } from '@/lib/apiBase'
 
 interface EventItem {
   id: string
@@ -22,7 +23,6 @@ interface EventItem {
   created_at: string
 }
 
-const API = '/api/v1'
 const YEAR_LEVELS = [1, 2, 3, 4]
 
 const emptyForm = {

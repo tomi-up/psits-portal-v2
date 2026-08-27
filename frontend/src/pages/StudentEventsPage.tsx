@@ -9,6 +9,7 @@ import MigrationNotice from '@/components/MigrationNotice'
 import { getStudentSidebarItems } from '@/lib/studentNav'
 import EmptyState from '@/components/EmptyState'
 import { studentFetch } from '@/lib/studentAuth'
+import { API } from '@/lib/apiBase'
 
 interface EventItem {
   id: string
@@ -21,7 +22,6 @@ interface EventItem {
   is_checked_out: boolean
 }
 
-const API = '/api/v1'
 type SortKey = 'name' | 'event_date'
 type StatusFilter = 'ALL' | 'NOT_REGISTERED' | 'REGISTERED' | 'CHECKED_IN' | 'PRESENT'
 

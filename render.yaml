@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: psits-portal-v2-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: "pip install poetry && poetry config virtualenvs.create false && poetry install --only main"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "False"
+      - key: LOG_LEVEL
+        value: INFO
+      # Everything below is a secret or deployment-specific value with no
+      # safe default - set actual values in the Render dashboard instead of
+      # here, the same way DATABASE_URL/SECRET_KEY etc. only ever live in
+      # the gitignored .env locally. See backend/.env.example for the full list.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_POOL_SIZE
+        value: "8"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "2"
+      - key: SECRET_KEY
+        sync: false
+      - key: MFA_ENCRYPTION_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false

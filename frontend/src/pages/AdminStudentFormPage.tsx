@@ -7,6 +7,7 @@ import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
 import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import { adminFetch } from '@/lib/adminAuth'
+import { API } from '@/lib/apiBase'
 
 interface StudentRow {
   id: string
@@ -25,7 +26,6 @@ interface StudentRow {
   enrollment_status: string | null
 }
 
-const API = '/api/v1'
 
 // Never add a program here without also adding the Program row in Supabase -
 // this admin form only lets you pick from what already exists.

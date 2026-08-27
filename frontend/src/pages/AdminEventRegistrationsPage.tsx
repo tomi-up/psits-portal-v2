@@ -21,6 +21,7 @@ import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import EmptyState from '@/components/EmptyState'
 import { adminFetch } from '@/lib/adminAuth'
+import { API, apiWebSocketUrl } from '@/lib/apiBase'
 
 interface RegistrationRow {
   student_id: string
@@ -49,7 +50,6 @@ interface RegistrationsData {
   registrations: RegistrationRow[]
 }
 
-const API = '/api/v1'
 type SortKey = 'student_name' | 'time_in'
 
 export default function AdminEventRegistrationsPage() {
@@ -147,8 +147,7 @@ export default function AdminEventRegistrationsPage() {
     const connect = () => {
       if (cancelled) return
 
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const ws = new WebSocket(`${protocol}://${window.location.host}${API}/events/${eventId}/attendance/ws`)
+      const ws = new WebSocket(apiWebSocketUrl(`${API}/events/${eventId}/attendance/ws`))
       wsRef.current = ws
 
       ws.onopen = () => {

@@ -8,6 +8,7 @@ import MigrationNotice from '@/components/MigrationNotice'
 import { getStudentSidebarItems } from '@/lib/studentNav'
 import EmptyState from '@/components/EmptyState'
 import { studentFetch } from '@/lib/studentAuth'
+import { API } from '@/lib/apiBase'
 
 interface AttendanceRow {
   event_id: string
@@ -18,7 +19,6 @@ interface AttendanceRow {
   is_late: boolean
 }
 
-const API = '/api/v1'
 type SortKey = 'event_name' | 'time_in'
 
 export default function StudentAttendancePage() {

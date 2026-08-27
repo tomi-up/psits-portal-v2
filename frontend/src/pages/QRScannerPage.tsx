@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { adminFetch, getAdminUser } from '@/lib/adminAuth'
+import { API } from '@/lib/apiBase'
 import {
   Wifi,
   WifiOff,
@@ -20,7 +21,6 @@ import {
 type ScanResult = { type: 'success' | 'duplicate' | 'invalid'; message: string }
 type ScanMode = 'IN' | 'OUT'
 
-const API = '/api/v1'
 
 interface EventItem {
   id: string

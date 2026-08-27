@@ -7,6 +7,7 @@ import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import EmptyState from '@/components/EmptyState'
 import { adminFetch } from '@/lib/adminAuth'
+import { API } from '@/lib/apiBase'
 
 interface StudentRow {
   id: string
@@ -25,7 +26,6 @@ interface StudentRow {
   enrollment_status: string | null
 }
 
-const API = '/api/v1'
 type SortKey = 'name' | 'student_id'
 
 export default function AdminStudentsPage() {
