@@ -73,7 +73,11 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, password_hash: str) -> bool:
     if len(password.encode('utf-8')) > 72:
         return False
-    return pwd_context.verify(password, password_hash)
+    try:
+        return pwd_context.verify(password, password_hash)
+    except ValueError:
+        # Bcrypt backend initialization error; treat as invalid password
+        return False
 
 
 def create_access_token(
