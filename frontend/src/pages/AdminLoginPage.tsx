@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import AuthLayout from '@/components/AuthLayout'
 import { notify } from '@/lib/toast'
 import { setAdminSession } from '@/lib/adminAuth'
+import { API } from '@/lib/apiBase'
 
 export default function AdminLoginPage() {
   const navigate = useNavigate()
@@ -22,7 +23,7 @@ export default function AdminLoginPage() {
     setIsSubmitting(true)
 
     try {
-      const res = await fetch('/api/v1/admin/auth/login', {
+      const res = await fetch(`${API}/admin/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

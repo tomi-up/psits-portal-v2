@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '@/components/AuthLayout'
 import OtpInput from '@/components/OtpInput'
 import { notify } from '@/lib/toast'
+import { API } from '@/lib/apiBase'
 
 type Step = 'verify' | 'confirm' | 'success' | 'already-activated'
 
@@ -33,7 +34,7 @@ export default function ActivationPage() {
     setLoading(true)
 
     try {
-      const verifyRes = await fetch('/api/v1/student-auth/student-activate/verify', {
+      const verifyRes = await fetch(`${API}/student-auth/student-activate/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -56,7 +57,7 @@ export default function ActivationPage() {
       const verifyData = await verifyRes.json()
 
       // Immediately generate the QR code so the student can scan it right away
-      const enrollRes = await fetch('/api/v1/student-auth/student-activate/enroll-mfa', {
+      const enrollRes = await fetch(`${API}/student-auth/student-activate/enroll-mfa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -92,7 +93,7 @@ export default function ActivationPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/v1/student-auth/student-activate/confirm-mfa', {
+      const res = await fetch(`${API}/student-auth/student-activate/confirm-mfa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

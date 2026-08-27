@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '@/components/AuthLayout'
 import OtpInput from '@/components/OtpInput'
 import { notify } from '@/lib/toast'
+import { API } from '@/lib/apiBase'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -15,7 +16,7 @@ export default function LoginPage() {
     setIsSubmitting(true)
 
     try {
-      const res = await fetch('/api/v1/student-auth/student-login', {
+      const res = await fetch(`${API}/student-auth/student-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
