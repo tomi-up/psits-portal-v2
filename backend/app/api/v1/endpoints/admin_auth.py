@@ -37,6 +37,10 @@ class AdminLoginResponse(BaseModel):
 @router.post("/login", response_model=AdminLoginResponse)
 @limiter.limit("5/minute")
 def admin_login(request: Request, body: AdminLoginRequest, db: Session = Depends(get_db)):
+    # Bcrypt has a hard 72-byte limit; reject oversized passwords upfront
+    if len(body.password.encode('utf-8')) > 72:
+        raise UnauthorizedException("Invalid email or password")
+
     admin = db.query(AdminAccount).filter(AdminAccount.email == body.email.lower()).first()
 
     if not admin or not admin.is_active or not verify_password(body.password, admin.password_hash):

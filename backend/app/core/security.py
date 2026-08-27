@@ -65,10 +65,14 @@ async def get_current_user(
 # ---------------------------------------------------------------------------
 
 def hash_password(password: str) -> str:
+    if len(password.encode('utf-8')) > 72:
+        raise ValueError("Password cannot exceed 72 bytes (bcrypt limitation)")
     return pwd_context.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
+    if len(password.encode('utf-8')) > 72:
+        return False
     return pwd_context.verify(password, password_hash)
 
 
