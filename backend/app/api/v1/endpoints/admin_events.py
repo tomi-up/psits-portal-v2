@@ -8,7 +8,8 @@ POST /api/v1/admin/auth/login.
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
-from datetime import datetime
+from datetime import datetime, timezone
+import uuid
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
@@ -136,6 +137,31 @@ def update_event(event_id: str, request: EventUpdateRequest, db: Session = Depen
     return EventAdminResponse.model_validate(event)
 
 
+@router.delete("/{event_id}")
+def delete_event(event_id: str, db: Session = Depends(get_db)):
+    """Delete an event, but only if it has zero attendance records. Once
+    students have actually been scanned in/out - or an admin has set an
+    attendance override - the event represents real historical data and
+    must be archived instead of deleted."""
+
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    has_attendance = db.query(Attendance).filter(Attendance.event_id == event_id).first() is not None
+    if has_attendance:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This event already has attendance records and can't be deleted. Archive it instead.",
+        )
+
+    db.query(EventRegistration).filter(EventRegistration.event_id == event_id).delete()
+    db.delete(event)
+    db.commit()
+
+    return {"deleted": True}
+
+
 class RegistrationRow(BaseModel):
     student_id: str
     student_name: str
@@ -217,7 +243,12 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
         school_year = school_years_by_student.get(student.id)
         attendance = attendance_by_student.get(student.id)
 
-        if not attendance or not attendance.time_in:
+        if attendance and attendance.status in ("EXCUSED", "ABSENT"):
+            # Explicitly set by an admin, regardless of scan history - distinct
+            # from the NO_SHOW default below (never scanned in) and from the
+            # year-level blanket excuse further down (never registered at all).
+            row_status = attendance.status
+        elif not attendance or not attendance.time_in:
             row_status = "NO_SHOW"
         else:
             row_status = finalize_status(attendance.status, event.status)
@@ -306,6 +337,64 @@ def _get_event_or_404(db: Session, event_id: str) -> Event:
 @router.get("/{event_id}/registrations")
 def get_event_registrations(event_id: str, db: Session = Depends(get_db)):
     event = _get_event_or_404(db, event_id)
+    return build_event_registrations(db, event)
+
+
+VALID_OVERRIDE_STATUSES = {"PRESENT", "EXCUSED", "ABSENT"}
+
+
+class AttendanceOverrideRequest(BaseModel):
+    status: str  # PRESENT, EXCUSED, or ABSENT
+
+
+@router.put("/{event_id}/registrations/{student_id}/override")
+def override_attendance(
+    event_id: str,
+    student_id: str,
+    request: AttendanceOverrideRequest,
+    db: Session = Depends(get_db),
+):
+    """Admin manually sets a student's attendance for this event, regardless
+    of scan history. Auto-registers the student first if they weren't
+    already, since setting an attendance outcome implies they're accounted
+    for at this event either way."""
+
+    if request.status not in VALID_OVERRIDE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Status must be one of {sorted(VALID_OVERRIDE_STATUSES)}",
+        )
+
+    event = _get_event_or_404(db, event_id)
+
+    student = db.query(Student).filter(Student.student_id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    registration = db.query(EventRegistration).filter(
+        EventRegistration.event_id == event_id, EventRegistration.student_id == student.id
+    ).first()
+    if not registration:
+        db.add(EventRegistration(event_id=event_id, student_id=student.id))
+
+    attendance = db.query(Attendance).filter(
+        Attendance.event_id == event_id, Attendance.student_id == student.id
+    ).first()
+    if not attendance:
+        attendance = Attendance(id=str(uuid.uuid4()), event_id=event_id, student_id=student.id)
+        db.add(attendance)
+
+    if request.status == "PRESENT":
+        now = datetime.now(timezone.utc)
+        attendance.time_in = attendance.time_in or now
+        attendance.time_out = now
+        attendance.status = "PRESENT"
+    else:
+        attendance.time_in = None
+        attendance.time_out = None
+        attendance.status = request.status
+
+    db.commit()
     return build_event_registrations(db, event)
 
 

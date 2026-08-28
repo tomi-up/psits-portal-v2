@@ -57,6 +57,7 @@ COLUMNS = [
     ("Section", 10),
     ("Registration Status", 18),
     ("Attendance Status", 18),
+    ("Late", 10),
     ("Time In", 12),
     ("Time Out", 12),
 ]
@@ -187,6 +188,7 @@ def _write_table(ws: Worksheet, data: "EventRegistrationsResponse", start_row: i
             r.section or "—",
             REGISTRATION_LABELS.get(r.registration_status, r.registration_status),
             STATUS_LABELS.get(r.status, r.status),
+            ("Yes" if r.is_late else "No") if r.time_in else "—",
             _to_ph_time_str(r.time_in),
             _to_ph_time_str(r.time_out),
         ]

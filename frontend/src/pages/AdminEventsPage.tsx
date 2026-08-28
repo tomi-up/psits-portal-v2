@@ -8,12 +8,14 @@ import {
   ArrowUpDown,
   QrCode,
   Pencil,
+  Trash2,
   ChevronLeft,
   ChevronRight,
   Copy,
   ExternalLink,
 } from 'lucide-react'
 import { notify } from '@/lib/toast'
+import { confirmAction } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
 import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
@@ -63,6 +65,29 @@ export default function AdminEventsPage() {
       notify.error('Network error', 'Could not load events.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDelete(event: EventItem) {
+    const confirmed = await confirmAction({
+      title: `Delete ${event.name}?`,
+      text: 'This only works if the event has no attendance records yet. This cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
+
+    try {
+      const res = await adminFetch(`${API}/officer/events/${event.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        notify.error('Could not delete', data.detail || 'This event may already have attendance records.')
+        return
+      }
+      notify.success('Deleted', `${event.name} has been deleted.`)
+      await loadEvents()
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
     }
   }
 
@@ -253,6 +278,13 @@ export default function AdminEventsPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </Link>
+                            <button
+                              onClick={() => void handleDelete(event)}
+                              title="Delete (only if no attendance yet)"
+                              className="rounded-lg p-2 text-rose-600 transition hover:bg-rose-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>

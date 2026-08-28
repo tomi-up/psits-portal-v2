@@ -14,6 +14,7 @@ import {
   Wifi,
   WifiOff,
   Download,
+  Info,
 } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
@@ -87,6 +88,30 @@ export default function AdminEventRegistrationsPage() {
       if (!background) notify.error('Failed to load', 'Could not load registrations for this event.')
     } finally {
       if (!background) setLoading(false)
+    }
+  }
+
+  const [overridingId, setOverridingId] = useState<string | null>(null)
+
+  async function handleOverride(studentId: string, newStatus: 'PRESENT' | 'EXCUSED' | 'ABSENT') {
+    if (!eventId) return
+    setOverridingId(studentId)
+    try {
+      const res = await adminFetch(`${API}/officer/events/${eventId}/registrations/${studentId}/override`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) {
+        notify.error('Override failed', 'Could not update this student\'s attendance.')
+        return
+      }
+      setData(await res.json())
+      notify.success('Updated', `Marked as ${newStatus.charAt(0) + newStatus.slice(1).toLowerCase()}.`)
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setOverridingId(null)
     }
   }
 
@@ -274,57 +299,57 @@ export default function AdminEventRegistrationsPage() {
         <main className="px-6 py-8 lg:px-10">
           {/* Stat cards */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Registered</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {loading ? '—' : data?.total_registered ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Present</p>
-              <p className="mt-2 text-2xl font-semibold text-emerald-600">
-                {loading ? '—' : data?.total_present ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Incomplete</p>
-              <p className="mt-2 text-2xl font-semibold text-sky-600">
-                {loading ? '—' : data?.total_incomplete ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Late</p>
-              <p className="mt-2 text-2xl font-semibold text-amber-600">
-                {loading ? '—' : data?.total_late ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Absent</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-600">
-                {loading ? '—' : data?.total_absent ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">No-shows</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-600">
-                {loading ? '—' : data?.total_no_show ?? 0}
-              </p>
-            </div>
+            <StatCard
+              label="Registered"
+              value={loading ? '—' : data?.total_registered ?? 0}
+              colorClass="text-slate-900"
+              tooltip="Total students who registered for this event."
+            />
+            <StatCard
+              label="Present"
+              value={loading ? '—' : data?.total_present ?? 0}
+              colorClass="text-emerald-600"
+              tooltip="Registered, scanned in, and scanned out."
+            />
+            <StatCard
+              label="Incomplete"
+              value={loading ? '—' : data?.total_incomplete ?? 0}
+              colorClass="text-sky-600"
+              tooltip="Scanned in but hasn't scanned out yet. Event is still active."
+            />
+            <StatCard
+              label="Late"
+              value={loading ? '—' : data?.total_late ?? 0}
+              colorClass="text-amber-600"
+              tooltip="Scanned in after the event's grace period."
+            />
+            <StatCard
+              label="Absent"
+              value={loading ? '—' : data?.total_absent ?? 0}
+              colorClass="text-rose-600"
+              tooltip="Registered, but never completed the scan-out before the event ended - or marked absent directly by an admin."
+            />
+            <StatCard
+              label="No-shows"
+              value={loading ? '—' : data?.total_no_show ?? 0}
+              colorClass="text-rose-600"
+              tooltip="Registered, but never scanned in at all."
+            />
             {(data?.total_not_registered ?? 0) > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white p-5">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Not Registered</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-600">
-                  {loading ? '—' : data?.total_not_registered ?? 0}
-                </p>
-              </div>
+              <StatCard
+                label="Not Registered"
+                value={loading ? '—' : data?.total_not_registered ?? 0}
+                colorClass="text-slate-600"
+                tooltip="Never registered for this event at all."
+              />
             )}
             {(data?.total_excused ?? 0) > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white p-5">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Excused</p>
-                <p className="mt-2 text-2xl font-semibold text-indigo-600">
-                  {loading ? '—' : data?.total_excused ?? 0}
-                </p>
-              </div>
+              <StatCard
+                label="Excused"
+                value={loading ? '—' : data?.total_excused ?? 0}
+                colorClass="text-indigo-600"
+                tooltip="Not required to attend - either their year level is excused, or an admin excused them individually."
+              />
             )}
           </div>
 
@@ -456,6 +481,7 @@ export default function AdminEventRegistrationsPage() {
                         </th>
                         <th className="px-5 py-3">Time Out</th>
                         <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Override</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -490,6 +516,25 @@ export default function AdminEventRegistrationsPage() {
                           </td>
                           <td className="px-5 py-3">
                             <StatusBadge status={r.status} />
+                          </td>
+                          <td className="px-5 py-3">
+                            <select
+                              value=""
+                              disabled={overridingId === r.student_id}
+                              onChange={(e) => {
+                                const value = e.target.value as 'PRESENT' | 'EXCUSED' | 'ABSENT'
+                                if (value) void handleOverride(r.student_id, value)
+                                e.target.value = ''
+                              }}
+                              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-600 focus:border-sky-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <option value="">
+                                {overridingId === r.student_id ? 'Saving...' : 'Set as...'}
+                              </option>
+                              <option value="PRESENT">Present</option>
+                              <option value="EXCUSED">Excused</option>
+                              <option value="ABSENT">Absent</option>
+                            </select>
                           </td>
                         </tr>
                       ))}
@@ -529,6 +574,33 @@ export default function AdminEventRegistrationsPage() {
             </div>
           </div>
         </main>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  colorClass,
+  tooltip,
+}: {
+  label: string
+  value: string | number
+  colorClass: string
+  tooltip: string
+}) {
+  return (
+    <div className="group relative rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center gap-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <Info className="h-3 w-3 text-slate-300" />
+      </div>
+      <p className={`mt-2 text-2xl font-semibold ${colorClass}`}>{value}</p>
+
+      <div className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+        {tooltip}
+        <div className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900" />
       </div>
     </div>
   )
