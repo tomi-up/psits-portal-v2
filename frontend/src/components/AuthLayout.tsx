@@ -22,28 +22,41 @@ const BINARY_BG_URL = `url("data:image/svg+xml,${encodeURIComponent(BINARY_BG_SV
 export default function AuthLayout({
   children,
   tagline = 'Student Portal for the Philippine Society of Information Technology Students',
+  forceLight = false,
 }: {
   children: ReactNode
   tagline?: string
+  /** Admin/legacy pages are intentionally out of dark-mode scope - their own
+   * text colors assume a white background, so this keeps the panel light
+   * regardless of the student side's (default-dark) theme setting instead
+   * of inheriting the ambient `dark` class and going low-contrast. */
+  forceLight?: boolean
 }) {
+  const lightDots = {
+    backgroundImage: `radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px), ${BINARY_BG_URL}`,
+    backgroundSize: '20px 20px, 140px 140px',
+  }
+  const darkDots = {
+    backgroundImage: `radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), ${BINARY_BG_URL}`,
+    backgroundSize: '20px 20px, 140px 140px',
+  }
+
   return (
     <div className="flex min-h-screen font-sans">
       {/* Form panel */}
-      <div className="relative flex w-full flex-col justify-center bg-white px-6 py-12 sm:px-12 lg:w-1/2 lg:px-20 dark:bg-slate-950">
-        <div
-          className="absolute inset-0 dark:hidden"
-          style={{
-            backgroundImage: `radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px), ${BINARY_BG_URL}`,
-            backgroundSize: '20px 20px, 140px 140px',
-          }}
-        />
-        <div
-          className="absolute inset-0 hidden dark:block"
-          style={{
-            backgroundImage: `radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), ${BINARY_BG_URL}`,
-            backgroundSize: '20px 20px, 140px 140px',
-          }}
-        />
+      <div
+        className={`relative flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2 lg:px-20 ${
+          forceLight ? 'bg-white' : 'bg-white dark:bg-slate-950'
+        }`}
+      >
+        {forceLight ? (
+          <div className="absolute inset-0" style={lightDots} />
+        ) : (
+          <>
+            <div className="absolute inset-0 dark:hidden" style={lightDots} />
+            <div className="absolute inset-0 hidden dark:block" style={darkDots} />
+          </>
+        )}
         <div className="relative mx-auto w-full max-w-sm">{children}</div>
       </div>
 

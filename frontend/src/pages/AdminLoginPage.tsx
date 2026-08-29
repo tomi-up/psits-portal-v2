@@ -51,7 +51,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout forceLight>
       <h1 className="text-2xl font-semibold text-slate-900">Admin Sign In</h1>
       <p className="mt-1 text-sm text-slate-500">Sign in with your officer/admin email and password.</p>
 
