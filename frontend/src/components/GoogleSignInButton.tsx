@@ -24,6 +24,17 @@ export default function GoogleSignInButton({ onCredential }: GoogleSignInButtonP
   const initializedRef = useRef(false)
   const lastWidthRef = useRef(0)
 
+  // initialize() below only ever runs once, freezing whatever callback
+  // closure it's given at that moment. onCredential's identity changes
+  // over time (submitGoogleLogin is re-created whenever turnstileToken
+  // updates), so without this ref the frozen callback would keep calling
+  // a stale version that still thinks the Turnstile token is null even
+  // after the widget succeeds. Always read the latest via the ref instead.
+  const onCredentialRef = useRef(onCredential)
+  useEffect(() => {
+    onCredentialRef.current = onCredential
+  }, [onCredential])
+
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
     if (!clientId) return
@@ -36,7 +47,7 @@ export default function GoogleSignInButton({ onCredential }: GoogleSignInButtonP
       if (!initializedRef.current) {
         window.google!.accounts.id.initialize({
           client_id: clientId as string,
-          callback: (response) => onCredential(response.credential),
+          callback: (response) => onCredentialRef.current(response.credential),
         })
         initializedRef.current = true
       }
@@ -91,7 +102,10 @@ export default function GoogleSignInButton({ onCredential }: GoogleSignInButtonP
       clearTimeout(resizeTimer)
       window.removeEventListener('resize', onWindowResize)
     }
-  }, [onCredential])
+    // Deliberately no dependency on onCredential - dispatch goes through
+    // onCredentialRef, so this setup effect only needs to run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) return null
 

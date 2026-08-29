@@ -25,7 +25,9 @@ export default function LoginPage() {
 
   const submitGoogleLogin = useCallback(async (idToken: string, boundStudentId?: string) => {
     if (!turnstileToken) {
-      notify.error('Verification required', 'Please complete the human verification check first.')
+      const message = 'Please complete the human verification check first.'
+      if (boundStudentId) setBindError(message)
+      else setLoginError(message)
       return
     }
 
