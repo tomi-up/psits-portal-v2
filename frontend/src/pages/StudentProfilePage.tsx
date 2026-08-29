@@ -5,7 +5,6 @@ import { notify } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
 import Sidebar from '@/components/Sidebar'
 import StudentHeader from '@/components/StudentHeader'
-import MigrationNotice from '@/components/MigrationNotice'
 import { getStudentSidebarItems } from '@/lib/studentNav'
 import { studentFetch } from '@/lib/studentAuth'
 import { API } from '@/lib/apiBase'
@@ -78,7 +77,6 @@ export default function StudentProfilePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans dark:bg-slate-950">
-      <MigrationNotice />
       <Sidebar
         title="PSITS Portal"
         open={menuOpen}

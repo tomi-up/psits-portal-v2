@@ -6,7 +6,6 @@ import { confirmAction } from '@/lib/confirm'
 import Sidebar from '@/components/Sidebar'
 import StudentHeader from '@/components/StudentHeader'
 import QrCodeModal from '@/components/QrCodeModal'
-import MigrationNotice from '@/components/MigrationNotice'
 import RegistrationNotice from '@/components/RegistrationNotice'
 import EmptyState from '@/components/EmptyState'
 import { getStudentSidebarItems } from '@/lib/studentNav'
@@ -128,7 +127,6 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans dark:bg-slate-950">
-      <MigrationNotice />
       <Sidebar
         title="PSITS Portal"
         open={menuOpen}
