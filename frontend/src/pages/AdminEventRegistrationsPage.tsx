@@ -39,6 +39,7 @@ interface RegistrationRow {
 interface RegistrationsData {
   event_id: string
   event_name: string
+  event_status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
   total_registered: number
   total_present: number
   total_incomplete: number
@@ -298,25 +299,34 @@ export default function AdminEventRegistrationsPage() {
                 {loading ? '—' : data?.total_late ?? 0}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Absent</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-600">
-                {loading ? '—' : data?.total_absent ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">No-shows</p>
-              <p className="mt-2 text-2xl font-semibold text-rose-600">
-                {loading ? '—' : data?.total_no_show ?? 0}
-              </p>
-            </div>
-            {(data?.total_not_registered ?? 0) > 0 && (
+            {/* Finalized (ARCHIVED) events show ABSENT - active events show the
+                live NO_SHOW/NOT_REGISTERED breakdown instead. The backend has
+                already collapsed NO_SHOW+NOT_REGISTERED into ABSENT once
+                archived, so these two card sets are mutually exclusive. */}
+            {data?.event_status === 'ARCHIVED' ? (
               <div className="rounded-xl border border-slate-200 bg-white p-5">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Not Registered</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-600">
-                  {loading ? '—' : data?.total_not_registered ?? 0}
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Absent</p>
+                <p className="mt-2 text-2xl font-semibold text-rose-600">
+                  {loading ? '—' : data?.total_absent ?? 0}
                 </p>
               </div>
+            ) : (
+              <>
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">No Show</p>
+                  <p className="mt-2 text-2xl font-semibold text-rose-600">
+                    {loading ? '—' : data?.total_no_show ?? 0}
+                  </p>
+                </div>
+                {(data?.total_not_registered ?? 0) > 0 && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-5">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Not Registered</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-600">
+                      {loading ? '—' : data?.total_not_registered ?? 0}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
             {(data?.total_excused ?? 0) > 0 && (
               <div className="rounded-xl border border-slate-200 bg-white p-5">

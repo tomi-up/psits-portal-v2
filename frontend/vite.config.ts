@@ -14,6 +14,7 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     host: true,
+    allowedHosts: true, // lets ngrok's (or any) tunnel domain through - dev only
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

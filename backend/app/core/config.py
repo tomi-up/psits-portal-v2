@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     supabase_key: str
     supabase_storage_bucket: str = "psits-uploads"
 
+    # Google Sign-In (student login) - required domain students must sign in
+    # with; skipped only in the staging environment so testing isn't blocked
+    # on having a real @<google_workspace_domain> account.
+    google_client_id: str = ""
+    google_workspace_domain: str = "usm.edu.ph"
+
+    # Cloudflare Turnstile - bot check in front of the Google sign-in flow's
+    # own custom bits (the student-id binding step has no bot protection of
+    # its own the way Google's button does).
+    turnstile_secret_key: str = ""
+
     # Email Configuration (Optional)
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = None

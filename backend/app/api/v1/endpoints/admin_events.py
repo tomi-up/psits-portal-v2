@@ -157,6 +157,7 @@ class EventRegistrationsResponse(BaseModel):
     event_id: str
     event_name: str
     event_date: datetime | None
+    event_status: str  # DRAFT, ACTIVE, or ARCHIVED - ARCHIVED means attendance is finalized
     total_registered: int
     total_present: int
     total_incomplete: int
@@ -187,9 +188,18 @@ def _latest_school_years(db: Session) -> dict[str, StudentSchoolYear]:
 
 def build_event_registrations(db: Session, event: Event) -> EventRegistrationsResponse:
     """Every student who registered for this event, with their scan-in/scan-out
-    status, plus - for an ARCHIVED, attendance-required event - every eligible
-    student who never registered at all. Shared by the DataTable endpoint and
-    the Excel export so both always show identical rows and totals.
+    status, plus - for an attendance-required event - every eligible student
+    who never registered at all. Shared by the DataTable endpoint and the
+    Excel export so both always show identical rows and totals.
+
+    Once the event is ARCHIVED, attendance is considered finalized: a
+    registered student with no time_in ("NO_SHOW" while still active) and a
+    never-registered, non-excused student ("NOT_REGISTERED" while active)
+    both collapse into "ABSENT" - there's no more opportunity for either to
+    still show up. registration_status is untouched by this - a student who
+    never registered stays registration_status="NOT_REGISTERED" even once
+    their attendance status reads "ABSENT". Excused students (registration_
+    status="NOT_REQUIRED") are never counted as absent, active or archived.
 
     "Late" is independent of status - a student can be late AND present
     (checked in late, checked out normally) or late AND incomplete.
@@ -218,7 +228,7 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
         attendance = attendance_by_student.get(student.id)
 
         if not attendance or not attendance.time_in:
-            row_status = "NO_SHOW"
+            row_status = "ABSENT" if event.status == "ARCHIVED" else "NO_SHOW"
         else:
             row_status = finalize_status(attendance.status, event.status)
 
@@ -243,7 +253,7 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
 
     total_registered = len(rows)
 
-    if event.status == "ARCHIVED" and event.attendance_required:
+    if event.attendance_required:
         # Note: intentionally not filtering by Student.is_active - that field
         # means "has completed MFA activation" (see student_auth.py), not
         # "currently enrolled". A student who hasn't even activated their
@@ -258,6 +268,12 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
         for student in not_registered_students:
             school_year = school_years_by_student.get(student.id)
             is_excused = bool(school_year and school_year.year_level in excused_year_levels)
+            if is_excused:
+                not_registered_status = "EXCUSED"
+            elif event.status == "ARCHIVED":
+                not_registered_status = "ABSENT"
+            else:
+                not_registered_status = "NOT_REGISTERED"
             rows.append(
                 RegistrationRow(
                     student_id=student.student_id,
@@ -272,7 +288,7 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
                     registered_at=None,
                     time_in=None,
                     time_out=None,
-                    status="EXCUSED" if is_excused else "NOT_REGISTERED",
+                    status=not_registered_status,
                     is_late=False,
                 )
             )
@@ -284,6 +300,7 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
         # unlike time_in/time_out which are naive-but-UTC - do not run it through
         # as_utc() or it gets mislabeled and shifts by 8 hours downstream.
         event_date=event.event_date,
+        event_status=event.status,
         total_registered=total_registered,
         total_present=sum(1 for r in rows if r.status == "PRESENT"),
         total_incomplete=sum(1 for r in rows if r.status == "INCOMPLETE"),

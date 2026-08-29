@@ -7,13 +7,14 @@ export interface SidebarItem {
   active?: boolean
   disabled?: boolean
   onClick?: () => void
+  id?: string
 }
 
 export function MobileMenuButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 lg:hidden"
+      className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
       aria-label="Open menu"
     >
       <Menu className="h-5 w-5" />
@@ -64,6 +65,7 @@ export default function Sidebar({
           {items.map((item, i) => (
             <div
               key={i}
+              id={item.id}
               onClick={item.disabled ? undefined : item.onClick}
               title={item.disabled ? 'Not yet implemented — in development' : undefined}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${

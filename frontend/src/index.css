@@ -94,3 +94,46 @@
   color: white !important;
   font-weight: 600;
 }
+
+/* driver.js (student portal tour) - default popover is light-only, override
+   for dark mode so it matches the rest of the app instead of flashing white. */
+.dark .driver-popover {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+.dark .driver-popover-title,
+.dark .driver-popover-description,
+.dark .driver-popover-progress-text {
+  color: #e2e8f0;
+}
+
+.dark .driver-popover-close-btn {
+  color: #94a3b8;
+}
+
+.dark .driver-popover-footer-btn {
+  background-color: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+  text-shadow: none;
+}
+
+.dark .driver-popover-footer-btn.driver-popover-next-btn {
+  background-color: #0284c7;
+  color: white;
+  border-color: #0284c7;
+}
+
+.dark .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #1e293b;
+}
+.dark .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #1e293b;
+}
+.dark .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #1e293b;
+}
+.dark .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #1e293b;
+}

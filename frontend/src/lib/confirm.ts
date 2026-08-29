@@ -41,3 +41,34 @@ export async function confirmAction(opts: {
 
   return result.isConfirmed
 }
+
+export async function confirmActionWithReason(opts: {
+  title: string
+  text?: string
+  confirmText?: string
+  cancelText?: string
+  reasons: string[]
+}): Promise<string | null> {
+  const inputOptions = Object.fromEntries(opts.reasons.map((r) => [r, r]))
+
+  const result = await Swal.fire({
+    ...BASE,
+    title: opts.title,
+    text: opts.text,
+    icon: 'warning',
+    input: 'select',
+    inputOptions,
+    inputPlaceholder: 'Select a reason',
+    showCancelButton: true,
+    confirmButtonText: opts.confirmText ?? 'Confirm',
+    cancelButtonText: opts.cancelText ?? 'Cancel',
+    customClass: {
+      ...BASE.customClass,
+      confirmButton: BASE.customClass.denyButton,
+    },
+    reverseButtons: true,
+    inputValidator: (value) => (value ? undefined : 'Please select a reason'),
+  })
+
+  return result.isConfirmed ? (result.value as string) : null
+}

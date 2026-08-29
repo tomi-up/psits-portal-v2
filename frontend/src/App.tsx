@@ -14,12 +14,19 @@ import LandingPage from '@/pages/LandingPage'
 import StudentDashboardPage from '@/pages/StudentDashboardPage'
 import StudentEventsPage from '@/pages/StudentEventsPage'
 import StudentAttendancePage from '@/pages/StudentAttendancePage'
+import StudentProfilePage from '@/pages/StudentProfilePage'
+import StudentBalancePage from '@/pages/StudentBalancePage'
+import StudentSanctionsPage from '@/pages/StudentSanctionsPage'
 import AdminLoginPage from '@/pages/AdminLoginPage'
 import AdminEventsPage from '@/pages/AdminEventsPage'
 import AdminEventFormPage from '@/pages/AdminEventFormPage'
 import AdminEventRegistrationsPage from '@/pages/AdminEventRegistrationsPage'
 import AdminStudentsPage from '@/pages/AdminStudentsPage'
 import AdminStudentFormPage from '@/pages/AdminStudentFormPage'
+import AdminExcuseRequestsPage from '@/pages/AdminExcuseRequestsPage'
+import AdminPaymentsPage from '@/pages/AdminPaymentsPage'
+import AdminNewsPage from '@/pages/AdminNewsPage'
+import AdminSanctionsPage from '@/pages/AdminSanctionsPage'
 import AdminHelpPage from '@/pages/AdminHelpPage'
 import QRScannerPage from '@/pages/QRScannerPage'
 import UnauthorizedPage from '@/pages/UnauthorizedPage'
@@ -59,6 +66,9 @@ export default function App() {
         <Route path="/dashboard" element={<StudentDashboardPage />} />
         <Route path="/events" element={<StudentEventsPage />} />
         <Route path="/attendance" element={<StudentAttendancePage />} />
+        <Route path="/profile" element={<StudentProfilePage />} />
+        <Route path="/balance" element={<StudentBalancePage />} />
+        <Route path="/sanctions" element={<StudentSanctionsPage />} />
 
         {/* Admin - email/password login, gated by RequireAdmin */}
         <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -71,6 +81,10 @@ export default function App() {
           <Route path="/admin/students" element={<AdminStudentsPage />} />
           <Route path="/admin/students/new" element={<AdminStudentFormPage />} />
           <Route path="/admin/students/:id/edit" element={<AdminStudentFormPage />} />
+          <Route path="/admin/excuse-requests" element={<AdminExcuseRequestsPage />} />
+          <Route path="/admin/payments" element={<AdminPaymentsPage />} />
+          <Route path="/admin/news" element={<AdminNewsPage />} />
+          <Route path="/admin/sanctions" element={<AdminSanctionsPage />} />
           <Route path="/admin/help" element={<AdminHelpPage />} />
 
           {/* Scanner - an admin must be logged in on this device to scan attendance */}

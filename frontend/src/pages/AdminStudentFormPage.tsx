@@ -207,7 +207,7 @@ export default function AdminStudentFormPage() {
         title="PSITS Admin"
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        items={getAdminSidebarItems('students', navigate, () => {})}
+        items={getAdminSidebarItems('students', navigate, () => navigate('/admin/events'))}
       />
 
       <div className="lg:pl-64">

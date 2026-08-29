@@ -11,6 +11,17 @@
       rel="stylesheet"
     />
     <title>PSITS Portal</title>
+    <script>
+      // Applied before first paint to avoid a flash of the wrong theme.
+      // Defaults to dark for first-time visitors until they toggle it themselves.
+      try {
+        var stored = localStorage.getItem('theme')
+        var dark = stored ? stored === 'dark' : true
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
     <div id="root"></div>

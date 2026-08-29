@@ -5,12 +5,15 @@ from sqlalchemy.orm import Session
 import uuid
 import pyotp
 from pydantic import BaseModel
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 from app.core.database import get_db
 from app.core.deps import get_current_student
 from app.models.student import Student, StudentSchoolYear
 from app.models.user import Profile, AccountStatus
 from app.models.audit_log import AuditLog
+from app.models.balance import MembershipFee
 from app.core.config import settings
 from app.core.crypto import (
     encrypt_activation_token,
@@ -21,6 +24,7 @@ from app.core.crypto import (
     decrypt_secret,
 )
 from app.core.security import create_access_token
+from app.core.turnstile import verify_turnstile
 from app.core.attendance import as_utc, is_late, finalize_status
 from app.core.rate_limit import limiter
 
@@ -75,6 +79,18 @@ class StudentLoginResponse(BaseModel):
     access_token: str
     expires_in: int
     user: dict
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+    student_id: str | None = None  # only required the first time this Google account signs in
+    turnstile_token: str
+
+
+class GoogleLoginNeedsBindingResponse(BaseModel):
+    status: str = "NEEDS_STUDENT_ID"
+    email: str
+    message: str = "First-time sign-in - enter your Student ID to link this Google account."
 
 
 # ============================================================================
@@ -375,9 +391,184 @@ def student_login(
     )
 
 
+@router.post("/google-login")
+@limiter.limit("10/minute")
+def google_login(
+    request: Request,
+    body: GoogleLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Student login via Google Sign-In. Google's ID token proves who owns the
+    email; the FIRST time a given Google account signs in, the caller must
+    also supply their Student ID once, binding this Google account to that
+    student's Profile (Profile.google_sub). Every sign-in after that just
+    needs the ID token.
+    """
+
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured on this server",
+        )
+
+    if not verify_turnstile(body.turnstile_token, remote_ip=request.client.host if request.client else None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification check failed. Please try again.",
+        )
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            body.id_token, google_requests.Request(), settings.google_client_id
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired Google sign-in",
+        )
+
+    if not claims.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google email is not verified",
+        )
+
+    email = claims["email"].lower()
+    google_sub = claims["sub"]
+    picture = claims.get("picture")
+
+    # Staging only: skip the school-domain requirement so testing isn't
+    # blocked on having a real school-issued Google account.
+    if settings.environment != "staging":
+        if not email.endswith(f"@{settings.google_workspace_domain}"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Sign in with your @{settings.google_workspace_domain} account",
+            )
+
+    # Already bound - this is a returning sign-in, no student_id needed.
+    profile = db.query(Profile).filter(Profile.google_sub == google_sub).first()
+    if profile:
+        student = db.query(Student).filter(Student.student_id == profile.student_id).first()
+        if not student or not student.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not active")
+
+        # Keep the avatar in sync in case they've changed their Google photo.
+        if picture and profile.profile_image_url != picture:
+            profile.profile_image_url = picture
+
+        access_token = create_access_token(subject=student.id, token_type="student")
+        db.add(AuditLog(
+            user_id=profile.id, action="student_login_success_google",
+            entity_type="student", entity_id=student.id,
+        ))
+        db.commit()
+
+        return StudentLoginResponse(
+            access_token=access_token,
+            expires_in=60 * 60 * 12,
+            user={
+                "id": profile.id,
+                "student_id": student.student_id,
+                "name": f"{student.first_name} {student.last_name}",
+                "email": profile.email,
+                "avatar_url": profile.profile_image_url,
+            },
+        )
+
+    # First time this Google account has signed in - need the Student ID to
+    # know which student record to bind it to.
+    if not body.student_id:
+        return GoogleLoginNeedsBindingResponse(email=email)
+
+    student = db.query(Student).filter(Student.student_id == body.student_id.strip()).first()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student record not found")
+
+    # Cross-match: the Google account signing in must be the specific email
+    # already on file for this student - knowing a Student ID alone (visible
+    # on IDs, class lists, etc.) is not enough to claim it.
+    if not student.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No email on file for this student. Contact an admin to set it up before linking.",
+        )
+    if student.email.strip().lower() != email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This Google account does not match the email on file for this Student ID.",
+        )
+
+    existing_profile = db.query(Profile).filter(Profile.student_id == student.student_id).first()
+    if existing_profile and existing_profile.google_sub:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This student is already linked to a different Google account",
+        )
+
+    if existing_profile:
+        existing_profile.google_sub = google_sub
+        existing_profile.email = email
+        existing_profile.status = AccountStatus.ACTIVE
+        existing_profile.profile_image_url = picture
+        profile = existing_profile
+    else:
+        profile = Profile(
+            auth_user_id=str(uuid.uuid4()),
+            student_id=student.student_id,
+            display_name=f"{student.first_name} {student.last_name}",
+            email=email,
+            status=AccountStatus.ACTIVE,
+            google_sub=google_sub,
+            profile_image_url=picture,
+        )
+        db.add(profile)
+
+    student.is_active = True
+    db.flush()
+
+    access_token = create_access_token(subject=student.id, token_type="student")
+    db.add(AuditLog(
+        user_id=profile.id, action="student_google_account_bound",
+        entity_type="student", entity_id=student.id,
+    ))
+    db.commit()
+
+    return StudentLoginResponse(
+        access_token=access_token,
+        expires_in=60 * 60 * 12,
+        user={
+            "id": profile.id,
+            "student_id": student.student_id,
+            "name": f"{student.first_name} {student.last_name}",
+            "email": profile.email,
+            "avatar_url": profile.profile_image_url,
+        },
+    )
+
+
 # ============================================================================
 # DASHBOARD
 # ============================================================================
+
+def _balance_summary(student: Student, db: Session) -> dict:
+    fees = db.query(MembershipFee).filter(MembershipFee.student_id == student.id).all()
+    total_due = sum(float(f.amount_due) for f in fees)
+    total_paid = sum(float(f.amount_paid) for f in fees)
+    outstanding = total_due - total_paid
+
+    if not fees:
+        status_label = "NO_DATA"
+    elif outstanding <= 0:
+        status_label = "PAID"
+    elif total_paid > 0:
+        status_label = "PARTIAL"
+    else:
+        status_label = "UNPAID"
+
+    return {"amount_due": outstanding, "status": status_label}
+
 
 @router.get("/me/dashboard")
 def get_student_dashboard(
@@ -400,6 +591,7 @@ def get_student_dashboard(
 
     program_name = school_year.program.code if school_year and school_year.program else None
     year_level = school_year.year_level if school_year else None
+    academic_standing = school_year.academic_standing if school_year else None
 
     attendance_rows = (
         db.query(Attendance, Event)
@@ -434,11 +626,10 @@ def get_student_dashboard(
             "email": profile.email if profile else None,
             "program": program_name,
             "year_level": year_level,
+            "academic_standing": academic_standing,
+            "avatar_url": profile.profile_image_url if profile else None,
         },
-        "balance": {
-            "amount_due": 0,
-            "status": "NO_DATA",
-        },
+        "balance": _balance_summary(student, db),
         "sanctions": [],
         "attendance": [
             {

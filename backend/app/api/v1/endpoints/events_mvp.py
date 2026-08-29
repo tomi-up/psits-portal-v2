@@ -17,6 +17,7 @@ from app.core.deps import get_current_admin, get_current_student, get_optional_c
 from app.core.attendance import as_utc as _as_utc
 from app.models.student import Student
 from app.models.event import Event, EventRegistration, Attendance
+from app.models.excuse_request import ExcuseRequest
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -65,6 +66,8 @@ class EventResponse(BaseModel):
     is_registered: bool = False
     is_checked_in: bool = False   # time_in set (scanned in at least once)
     is_checked_out: bool = False  # time_out set (fully present, QR no longer needed)
+    excuse_status: str | None = None  # PENDING, APPROVED, REJECTED, or None if never requested
+    excuse_rejection_reason: str | None = None
 
     class Config:
         from_attributes = True
@@ -113,6 +116,8 @@ def list_events(
     registered_ids = set()
     checked_in_ids = set()
     checked_out_ids = set()
+    excuse_status_by_event: dict[str, str] = {}
+    excuse_reason_by_event: dict[str, str | None] = {}
     if student:
         registered_ids = {
             r.event_id for r in db.query(EventRegistration).filter(
@@ -124,6 +129,16 @@ def list_events(
                 checked_in_ids.add(a.event_id)
             if a.time_out:
                 checked_out_ids.add(a.event_id)
+
+        # Most recent request per event, in case a REJECTED one was resubmitted.
+        for req in (
+            db.query(ExcuseRequest)
+            .filter(ExcuseRequest.student_id == student.id)
+            .order_by(ExcuseRequest.created_at.desc())
+            .all()
+        ):
+            excuse_status_by_event.setdefault(req.event_id, req.status)
+            excuse_reason_by_event.setdefault(req.event_id, req.rejection_reason)
 
     return {
         "events": [
@@ -138,6 +153,8 @@ def list_events(
                 is_registered=e.id in registered_ids,
                 is_checked_in=e.id in checked_in_ids,
                 is_checked_out=e.id in checked_out_ids,
+                excuse_status=excuse_status_by_event.get(e.id),
+                excuse_rejection_reason=excuse_reason_by_event.get(e.id),
             )
             for e in events
         ]
@@ -215,6 +232,54 @@ def register_for_event(
             db.rollback()
 
     return {"status": "REGISTERED", "event_id": event_id, "student_id": student.student_id}
+
+
+class ExcuseRequestCreate(BaseModel):
+    reason: str
+
+
+@router.post("/{event_id}/excuse-request")
+def submit_excuse_request(
+    event_id: str,
+    body: ExcuseRequestCreate,
+    student: Student = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    """Student asks to be excused from a required event, pending admin
+    review. Only meaningful for events that actually require attendance."""
+
+    reason = body.reason.strip()
+    if not reason:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reason is required")
+
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    if not event.attendance_required:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This event doesn't require attendance, so there's nothing to be excused from",
+        )
+
+    existing = (
+        db.query(ExcuseRequest)
+        .filter(
+            ExcuseRequest.event_id == event_id,
+            ExcuseRequest.student_id == student.id,
+            ExcuseRequest.status.in_(["PENDING", "APPROVED"]),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"You already have a {existing.status.lower()} excuse request for this event",
+        )
+
+    db.add(ExcuseRequest(event_id=event_id, student_id=student.id, reason=reason, status="PENDING"))
+    db.commit()
+
+    return {"status": "PENDING"}
 
 
 # ============================================================================

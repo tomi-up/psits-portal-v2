@@ -1,5 +1,24 @@
 import type { ReactNode } from 'react'
 
+const BINARY_BG_SVG = `
+  <svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'>
+    <text x='4' y='18' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.16)'>1</text>
+    <text x='34' y='42' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.14)'>0</text>
+    <text x='66' y='16' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.16)'>0</text>
+    <text x='98' y='38' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.12)'>1</text>
+    <text x='18' y='64' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.14)'>0</text>
+    <text x='52' y='72' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.16)'>1</text>
+    <text x='84' y='68' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.12)'>0</text>
+    <text x='116' y='90' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.16)'>1</text>
+    <text x='8' y='100' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.14)'>1</text>
+    <text x='40' y='108' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.12)'>0</text>
+    <text x='70' y='114' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.16)'>1</text>
+    <text x='104' y='128' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.14)'>0</text>
+    <text x='22' y='134' font-family='monospace' font-size='13' fill='rgba(56,189,248,0.12)'>0</text>
+  </svg>
+`
+const BINARY_BG_URL = `url("data:image/svg+xml,${encodeURIComponent(BINARY_BG_SVG)}")`
+
 export default function AuthLayout({
   children,
   tagline = 'Student Portal for the Philippine Society of Information Technology Students',
@@ -10,13 +29,21 @@ export default function AuthLayout({
   return (
     <div className="flex min-h-screen font-sans">
       {/* Form panel */}
-      <div
-        className="relative flex w-full flex-col justify-center px-6 py-12 sm:px-12 lg:w-1/2 lg:px-20"
-        style={{
-          backgroundImage: 'radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
-        }}
-      >
+      <div className="relative flex w-full flex-col justify-center bg-white px-6 py-12 sm:px-12 lg:w-1/2 lg:px-20 dark:bg-slate-950">
+        <div
+          className="absolute inset-0 dark:hidden"
+          style={{
+            backgroundImage: `radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px), ${BINARY_BG_URL}`,
+            backgroundSize: '20px 20px, 140px 140px',
+          }}
+        />
+        <div
+          className="absolute inset-0 hidden dark:block"
+          style={{
+            backgroundImage: `radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), ${BINARY_BG_URL}`,
+            backgroundSize: '20px 20px, 140px 140px',
+          }}
+        />
         <div className="relative mx-auto w-full max-w-sm">{children}</div>
       </div>
 

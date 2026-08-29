@@ -15,8 +15,8 @@ export default function EmptyState({ title, subtitle }: EmptyStateProps) {
           autoplay
         />
       </div>
-      <p className="mt-2 text-sm font-medium text-slate-600">{title}</p>
-      {subtitle && <p className="mt-1 text-xs text-slate-400">{subtitle}</p>}
+      <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">{title}</p>
+      {subtitle && <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{subtitle}</p>}
     </div>
   )
 }

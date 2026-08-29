@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { RefreshCw, ArrowRight, ClipboardCheck, Wallet, Gavel, Moon, Bell, ChevronDown, LogOut } from 'lucide-react'
+import { ArrowRight, ClipboardCheck, Wallet, Gavel, QrCode, UserPlus } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
-import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
+import Sidebar from '@/components/Sidebar'
+import StudentHeader from '@/components/StudentHeader'
+import QrCodeModal from '@/components/QrCodeModal'
 import MigrationNotice from '@/components/MigrationNotice'
 import RegistrationNotice from '@/components/RegistrationNotice'
 import EmptyState from '@/components/EmptyState'
 import { getStudentSidebarItems } from '@/lib/studentNav'
 import { studentFetch } from '@/lib/studentAuth'
 import { API } from '@/lib/apiBase'
+import { startStudentTourIfFirstVisit } from '@/lib/tour'
 
 interface DashboardData {
   student: {
@@ -18,6 +21,7 @@ interface DashboardData {
     email: string | null
     program: string | null
     year_level: number | null
+    avatar_url: string | null
   }
   balance: { amount_due: number; status: string }
   sanctions: unknown[]
@@ -52,18 +56,9 @@ export default function StudentDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const profileRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setProfileOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+  const [qrEvent, setQrEvent] = useState<EventItem | null>(null)
+  const [sanctionsCount, setSanctionsCount] = useState<number | null>(null)
+  const [hasActiveSettlement, setHasActiveSettlement] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('user')
@@ -79,18 +74,29 @@ export default function StudentDashboardPage() {
     void loadAll()
   }, [studentId])
 
+  useEffect(() => {
+    if (!loading && data) startStudentTourIfFirstVisit(() => setMenuOpen(true), () => setMenuOpen(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, data])
+
   async function loadAll(isRefresh = false) {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
     try {
-      const [dashRes, eventsRes] = await Promise.all([
+      const [dashRes, eventsRes, sanctionsRes] = await Promise.all([
         studentFetch(`${API}/student-auth/me/dashboard`),
         studentFetch(`${API}/events/`),
+        studentFetch(`${API}/sanctions/`),
       ])
       if (dashRes.ok) setData(await dashRes.json())
       if (eventsRes.ok) {
         const events: EventItem[] = (await eventsRes.json()).events
         setNextEvent(events[0] ?? null) // already ordered by event_date by the backend
+      }
+      if (sanctionsRes.ok) {
+        const sanctionsData = await sanctionsRes.json()
+        setSanctionsCount(sanctionsData.pending_count)
+        setHasActiveSettlement(sanctionsData.active_settlement?.status === 'PENDING')
       }
     } catch {
       notify.error('Network error', 'Could not load your dashboard.')
@@ -121,7 +127,7 @@ export default function StudentDashboardPage() {
   const isLoading = loading || !data
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans dark:bg-slate-950">
       <MigrationNotice />
       <Sidebar
         title="PSITS Portal"
@@ -132,75 +138,16 @@ export default function StudentDashboardPage() {
 
       {/* Main */}
       <div className="lg:pl-64">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
-          <div className="flex items-start gap-3">
-            <MobileMenuButton onClick={() => setMenuOpen(true)} />
-          {isLoading ? (
-            <div className="space-y-2">
-              <div className="h-5 w-48 animate-pulse rounded bg-slate-200" />
-              <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-            </div>
-          )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => loadAll(true)}
-              disabled={refreshing || isLoading}
-              title="Refresh"
-              className="rounded-full border border-slate-200 p-2.5 text-slate-500 transition hover:bg-slate-50 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={() => notify.info('Coming soon', 'Dark mode is on the way.')}
-              title="Toggle dark mode"
-              className="rounded-full border border-slate-200 p-2.5 text-slate-500 transition hover:bg-slate-50"
-            >
-              <Moon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => notify.info('Coming soon', 'Notifications are on the way.')}
-              title="Notifications"
-              className="relative rounded-full border border-slate-200 p-2.5 text-slate-500 transition hover:bg-slate-50"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-orange-500" />
-            </button>
-
-            {!isLoading && (
-              <div ref={profileRef} className="relative">
-                <button
-                  onClick={() => setProfileOpen((o) => !o)}
-                  className="flex items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 transition hover:bg-slate-50"
-                >
-                  <img
-                    src={`https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=${encodeURIComponent(data!.student.name)}`}
-                    alt={data!.student.name}
-                    className="h-8 w-8 rounded-full bg-slate-100"
-                  />
-                  <span className="text-sm font-medium text-slate-700">{data!.student.name.split(' ')[0]}</span>
-                  <ChevronDown className="h-4 w-4 text-slate-400" />
-                </button>
-
-                {profileOpen && (
-                  <div className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </header>
+        <StudentHeader
+          onMenuOpen={() => setMenuOpen(true)}
+          onMenuClose={() => setMenuOpen(false)}
+          onRefresh={() => loadAll(true)}
+          refreshing={refreshing}
+          loading={isLoading}
+          studentName={isLoading ? null : data!.student.name}
+          avatarUrl={isLoading ? null : data!.student.avatar_url}
+          onLogout={handleLogout}
+        />
 
         <main className="px-6 py-8 lg:px-10">
           <RegistrationNotice />
@@ -221,8 +168,32 @@ export default function StudentDashboardPage() {
                   accent="sky"
                   icon={<ClipboardCheck className="h-4 w-4" />}
                 />
-                <StatCard label="Balance" value="Coming Soon" accent="emerald" icon={<Wallet className="h-4 w-4" />} />
-                <StatCard label="Sanctions" value="Coming Soon" accent="amber" icon={<Gavel className="h-4 w-4" />} />
+                <StatCard
+                  label="Balance"
+                  value={
+                    data!.balance.status === 'NO_DATA'
+                      ? 'No dues yet'
+                      : `₱${data!.balance.amount_due.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  }
+                  accent="emerald"
+                  icon={<Wallet className="h-4 w-4" />}
+                  href="/balance"
+                />
+                <StatCard
+                  label="Sanctions"
+                  value={
+                    sanctionsCount === null
+                      ? '...'
+                      : sanctionsCount > 0
+                        ? `${sanctionsCount} pending`
+                        : hasActiveSettlement
+                          ? 'In progress'
+                          : 'Good standing'
+                  }
+                  accent={sanctionsCount ? 'rose' : hasActiveSettlement ? 'sky' : 'emerald'}
+                  icon={<Gavel className="h-4 w-4" />}
+                  href="/sanctions"
+                />
               </>
             )}
           </div>
@@ -230,10 +201,10 @@ export default function StudentDashboardPage() {
           {/* Next upcoming event highlight */}
           <section className="mt-8">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900">Upcoming Event</h2>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Upcoming Event</h2>
               <Link
                 to="/events"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-sky-600 transition hover:text-sky-700"
               >
                 View all events
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -241,20 +212,20 @@ export default function StudentDashboardPage() {
             </div>
 
             {isLoading ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-5">
-                <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-                <div className="mt-2 h-3 w-56 animate-pulse rounded bg-slate-100" />
+              <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <div className="h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-2 h-3 w-56 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : !nextEvent ? (
-              <div className="rounded-xl border border-slate-200 bg-white">
+              <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <EmptyState title="No upcoming events." />
               </div>
             ) : (
-              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-semibold text-slate-900">{nextEvent.name}</p>
+                  <p className="font-semibold text-slate-900 dark:text-white">{nextEvent.name}</p>
                   {nextEvent.event_date && (
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                       {new Date(nextEvent.event_date).toLocaleString(undefined, {
                         dateStyle: 'medium',
                         timeStyle: 'short',
@@ -263,22 +234,29 @@ export default function StudentDashboardPage() {
                   )}
                 </div>
                 {nextEvent.is_checked_out ? (
-                  <span className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
+                  <span className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
                     ✓ Present
                   </span>
                 ) : nextEvent.is_registered ? (
-                  <Link
-                    to="/events"
-                    className="rounded-lg bg-sky-600 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-sky-700"
-                  >
-                    {nextEvent.is_checked_in ? 'Checked in — view QR' : 'View QR Code'}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {nextEvent.is_checked_in && (
+                      <span className="text-xs font-medium text-sky-600 dark:text-sky-400">Checked in</span>
+                    )}
+                    <button
+                      onClick={() => setQrEvent(nextEvent)}
+                      title={nextEvent.is_checked_in ? 'Checked in — view QR' : 'View QR Code'}
+                      className="rounded-lg bg-sky-600 p-2.5 text-white transition hover:bg-sky-700"
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </button>
+                  </div>
                 ) : (
                   <Link
                     to="/events"
-                    className="rounded-lg border border-sky-600 px-4 py-2 text-center text-sm font-semibold text-sky-600 transition hover:bg-sky-50"
+                    title="Register"
+                    className="rounded-lg bg-sky-600 p-2.5 text-white transition hover:bg-sky-700"
                   >
-                    Register
+                    <UserPlus className="h-4 w-4" />
                   </Link>
                 )}
               </div>
@@ -286,6 +264,8 @@ export default function StudentDashboardPage() {
           </section>
         </main>
       </div>
+
+      {studentId && <QrCodeModal event={qrEvent} studentId={studentId} onClose={() => setQrEvent(null)} />}
     </div>
   )
 }
@@ -295,41 +275,58 @@ function StatCard({
   value,
   accent,
   icon,
+  href,
 }: {
   label: string
   value: string
-  accent: 'sky' | 'emerald' | 'amber'
+  accent: 'sky' | 'emerald' | 'amber' | 'rose'
   icon: ReactNode
+  href?: string
 }) {
   const colors = {
-    sky: 'bg-sky-50 text-sky-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    amber: 'bg-amber-50 text-amber-600',
+    sky: 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400',
+    emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400',
+    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400',
+    rose: 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400',
   }[accent]
 
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+  const content = (
+    <>
       <div className="flex items-center gap-2">
         <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${colors}`}>{icon}</span>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
       </div>
-      <p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p>
-    </div>
+      <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
+    </>
   )
+
+  const className =
+    'rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900' +
+    (href ? ' transition hover:border-sky-300 dark:hover:border-sky-700' : '')
+
+  if (href) {
+    return (
+      <Link to={href} className={className}>
+        {content}
+      </Link>
+    )
+  }
+
+  return <div className={className}>{content}</div>
 }
 
 function StatCardSkeleton() {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
-      <div className="mt-3 h-7 w-16 animate-pulse rounded bg-slate-200" />
+    <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="h-3 w-24 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+      <div className="mt-3 h-7 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
     </div>
   )
 }
 
 function LogoSpinner() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 font-sans">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 font-sans dark:bg-slate-950">
       <img src="/psits-logo.png" alt="PSITS" className="h-16 w-16 animate-spin-slow" />
     </div>
   )
