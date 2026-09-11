@@ -1,4 +1,5 @@
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
+import emptyAnimation from '../../assets/images/empty.json'
 
 interface EmptyStateProps {
   title: string
@@ -10,7 +11,7 @@ export default function EmptyState({ title, subtitle }: EmptyStateProps) {
     <div className="flex flex-col items-center justify-center py-10 text-center">
       <div className="h-40 w-40">
         <DotLottieReact
-          src="https://lottie.host/b2c86abb-d996-4003-aa8b-3bd2c6582ab4/Lxizzc3f3C.lottie"
+          data={emptyAnimation}
           loop
           autoplay
         />
