@@ -120,7 +120,7 @@ export default function ActivationPage() {
   }
 
   return (
-    <AuthLayout tagline="Activate your student account to check in at PSITS events with a QR code.">
+    <AuthLayout forceLight tagline="Activate your student account to check in at PSITS events with a QR code.">
       {/* STEP 1: VERIFY IDENTITY */}
       {step === 'verify' && (
         <>

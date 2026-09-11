@@ -1,7 +1,7 @@
 const TOKEN_KEY = 'access_token'
 
 export function getStudentToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  return sessionStorage.getItem(TOKEN_KEY)
 }
 
 /**
@@ -17,8 +17,8 @@ export async function studentFetch(input: string, init: RequestInit = {}): Promi
   const res = await fetch(input, { ...init, headers })
 
   if (res.status === 401) {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user')
+    sessionStorage.removeItem('access_token')
+    sessionStorage.removeItem('user')
     window.location.href = '/login'
   }
 

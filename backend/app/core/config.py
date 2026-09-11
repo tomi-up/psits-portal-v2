@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
+    production_database_url: Optional[str] = None  # migration scripts only
     database_pool_size: int = 20
     database_max_overflow: int = 10
     database_pool_pre_ping: bool = True
@@ -32,11 +33,25 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = True
     cors_allow_methods: str = "*"
     cors_allow_headers: str = "*"
+    trusted_hosts: str = ""
 
     # Supabase Auth (REQUIRED - the authentication provider)
     supabase_url: str
     supabase_key: str
+    supabase_service_role_key: Optional[str] = None
+    supabase_storage_url: Optional[str] = None
     supabase_storage_bucket: str = "psits-uploads"
+
+    # Google Sign-In (student login) - required domain students must sign in
+    # with; skipped only in the staging environment so testing isn't blocked
+    # on having a real @<google_workspace_domain> account.
+    google_client_id: str = ""
+    google_workspace_domain: str = "usm.edu.ph"
+
+    # Cloudflare Turnstile - bot check in front of the Google sign-in flow's
+    # own custom bits (the student-id binding step has no bot protection of
+    # its own the way Google's button does).
+    turnstile_secret_key: str = ""
 
     # Email Configuration (Optional)
     smtp_host: Optional[str] = None
@@ -74,6 +89,11 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins from comma-separated string."""
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @property
+    def trusted_hosts_list(self) -> list[str]:
+        """Parse additional hostnames/IPs accepted by TrustedHostMiddleware."""
+        return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
 
     @property
     def allowed_extensions_list(self) -> list[str]:

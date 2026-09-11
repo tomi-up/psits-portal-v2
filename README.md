@@ -31,6 +31,8 @@ An admin + student portal for the Philippine Society of Information Technology S
 
 **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, React Router
 
+**Mobile scanner:** Flutter 3, Dart, Android CameraX/ML Kit via `mobile_scanner`
+
 **Infrastructure:** Supabase (PostgreSQL + connection pooling)
 
 ---
@@ -92,6 +94,17 @@ npm run dev
 ```
 
 Runs on `http://localhost:5173`, with `/api` proxied to the backend during development (see `vite.config.ts`).
+
+### Android Scanner
+
+```bash
+cd mobile_app_scanner
+flutter run
+```
+
+The development build defaults to the current LAN backend at
+`http://192.168.1.10:8000/api/v1`. Physical-device and release build commands
+are documented in [`mobile_app_scanner/README.md`](mobile_app_scanner/README.md).
 
 ---
 

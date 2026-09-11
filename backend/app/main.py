@@ -71,6 +71,7 @@ def create_app() -> FastAPI:
         TrustedHostMiddleware,
         allowed_hosts=(
             ["localhost", "127.0.0.1", "0.0.0.0"]
+            + settings.trusted_hosts_list
             + [h for h in cors_hostnames if h]
             + ([render_hostname] if render_hostname else [])
         )

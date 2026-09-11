@@ -31,9 +31,23 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: TRUSTED_HOSTS
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_URL
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: psits-uploads
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_WORKSPACE_DOMAIN
+        value: usm.edu.ph
+      - key: TURNSTILE_SECRET_KEY
         sync: false
       - key: ADMIN_EMAIL
         sync: false

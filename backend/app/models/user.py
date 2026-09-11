@@ -30,10 +30,15 @@ class Profile(BaseModel):
     profile_image_url = Column(String(512), nullable=True)
     status = Column(SQLEnum(AccountStatus), default=AccountStatus.ACTIVE, index=True)
     totp_secret = Column(TEXT, nullable=True)  # Fernet-encrypted TOTP secret
+    # Google's stable per-account subject id ("sub" claim), bound to this
+    # student's Profile the first time they sign in with Google - replaces
+    # totp_secret as the auth factor when set.
+    google_sub = Column(String(255), unique=True, nullable=True)
 
     __table_args__ = (
         Index('ix_profiles_auth_user_id', 'auth_user_id'),
         Index('ix_profiles_student_id', 'student_id'),
+        Index('ix_profiles_google_sub', 'google_sub'),
     )
 
     def __repr__(self):

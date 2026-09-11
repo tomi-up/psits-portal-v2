@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
-import { Clock, Type, MapPin, Image as ImageIcon, AlignLeft, ArrowLeft } from 'lucide-react'
+import { Clock, Type, MapPin, AlignLeft, ArrowLeft } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
 import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import DatePicker from '@/components/DatePicker'
+import ImageUploadField from '@/components/ImageUploadField'
 import { adminFetch } from '@/lib/adminAuth'
 import { API } from '@/lib/apiBase'
 
@@ -20,10 +21,24 @@ interface EventItem {
   status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
   attendance_required: boolean
   excused_year_levels: number[] | null
+  survey_required: boolean
+  late_threshold_minutes: number
+  event_code: string | null
+  attendance_phase: string
   created_at: string
 }
 
 const YEAR_LEVELS = [1, 2, 3, 4]
+
+/** Preview of the late cutoff, so the threshold isn't abstract minutes. */
+function addMinutes(time: string, minutes: string): string {
+  const parsed = Number(minutes)
+  if (!time || !Number.isFinite(parsed)) return '—'
+  const [h, m] = time.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return '—'
+  const total = (h * 60 + m + parsed) % (24 * 60)
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
 
 const emptyForm = {
   name: '',
@@ -35,6 +50,8 @@ const emptyForm = {
   cover_image_url: '',
   attendance_required: false,
   excused_year_levels: [] as number[],
+  survey_required: false,
+  late_threshold_minutes: '20',
 }
 
 export default function AdminEventFormPage() {
@@ -82,6 +99,8 @@ export default function AdminEventFormPage() {
       cover_image_url: event.cover_image_url ?? '',
       attendance_required: event.attendance_required,
       excused_year_levels: event.excused_year_levels ?? [],
+      survey_required: event.survey_required,
+      late_threshold_minutes: String(event.late_threshold_minutes ?? 20),
     })
   }
 
@@ -95,12 +114,18 @@ export default function AdminEventFormPage() {
   }
 
   async function handleSubmit() {
+    const threshold = Number(form.late_threshold_minutes)
     const errors = {
       name: !form.name,
       venue: !form.venue,
       description: !form.description,
       event_date: !form.event_date,
       event_time: !form.event_time,
+      late_threshold_minutes:
+        form.late_threshold_minutes === '' ||
+        !Number.isInteger(threshold) ||
+        threshold < 0 ||
+        threshold > 720,
     }
     setFieldErrors(errors)
     if (Object.values(errors).some(Boolean)) return
@@ -122,6 +147,8 @@ export default function AdminEventFormPage() {
           cover_image_url: form.cover_image_url || null,
           attendance_required: form.attendance_required,
           excused_year_levels: form.excused_year_levels.length ? form.excused_year_levels : null,
+          survey_required: form.survey_required,
+          late_threshold_minutes: threshold,
         }),
       })
 
@@ -156,8 +183,8 @@ export default function AdminEventFormPage() {
 
   function fieldClass(field: string) {
     return fieldErrors[field]
-      ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20'
-      : 'border-slate-200 bg-slate-50 focus:border-sky-500 focus:ring-sky-500/20'
+      ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20 dark:border-red-700 dark:bg-red-950/30'
+      : 'border-slate-200 bg-slate-50 focus:border-sky-500 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800'
   }
 
   function clearError(field: string) {
@@ -165,7 +192,7 @@ export default function AdminEventFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar
         title="PSITS Admin"
         open={menuOpen}
@@ -176,12 +203,12 @@ export default function AdminEventFormPage() {
       />
 
       <div className="lg:pl-64">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-4 lg:px-10">
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMenuOpen(true)} />
             <Link
               to="/admin/events"
-              className="flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700"
+              className="flex items-center gap-1 text-sm font-medium text-sky-600 dark:text-sky-400 transition hover:text-sky-700"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -191,24 +218,24 @@ export default function AdminEventFormPage() {
         </header>
 
         <main className="px-6 py-8 lg:px-10">
-          <div className="w-full rounded-xl border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 text-base font-semibold text-slate-900">
+          <div className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
+            <h2 className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {isEditing ? 'Edit Event' : 'Create Event'}
             </h2>
             {loading ? (
               <div className="space-y-3">
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Title <span className="text-red-500">*</span>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Title <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <div className="relative">
-                    <Type className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Type className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                     <input
                       type="text"
                       value={form.name}
@@ -217,18 +244,18 @@ export default function AdminEventFormPage() {
                         clearError('name')
                       }}
                       placeholder="General Assembly"
-                      className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('name')}`}
+                      className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('name')}`}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Venue <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Venue <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <div className="relative">
-                      <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={form.venue}
@@ -237,14 +264,14 @@ export default function AdminEventFormPage() {
                           clearError('venue')
                         }}
                         placeholder="USM Gymnasium"
-                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('venue')}`}
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('venue')}`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Date <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Date <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <DatePicker
                       value={form.event_date}
@@ -257,11 +284,11 @@ export default function AdminEventFormPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Time <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Time <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <div className="relative">
-                      <Clock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Clock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="time"
                         value={form.event_time}
@@ -269,7 +296,7 @@ export default function AdminEventFormPage() {
                           setForm({ ...form, event_time: e.target.value })
                           clearError('event_time')
                         }}
-                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('event_time')}`}
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('event_time')}`}
                       />
                     </div>
                   </div>
@@ -277,11 +304,11 @@ export default function AdminEventFormPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
                     <select
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value as EventItem['status'] })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     >
                       <option value="DRAFT">Draft (hidden from students)</option>
                       <option value="ACTIVE">Active (open for registration)</option>
@@ -290,26 +317,24 @@ export default function AdminEventFormPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Cover Image URL</label>
-                    <div className="relative">
-                      <ImageIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="url"
-                        value={form.cover_image_url}
-                        onChange={(e) => setForm({ ...form, cover_image_url: e.target.value })}
-                        placeholder="https://..."
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                      />
-                    </div>
+                    <ImageUploadField
+                      label="Cover image"
+                      value={form.cover_image_url}
+                      purpose="event-cover"
+                      onChange={(coverImageUrl) =>
+                        setForm((current) => ({ ...current, cover_image_url: coverImageUrl }))
+                      }
+                      previewClassName="h-36 w-full"
+                    />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Description <span className="text-red-500">*</span>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Description <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <div className="relative">
-                    <AlignLeft className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
+                    <AlignLeft className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
                     <textarea
                       value={form.description}
                       onChange={(e) => {
@@ -318,16 +343,49 @@ export default function AdminEventFormPage() {
                       }}
                       rows={4}
                       placeholder="What is this event about?"
-                      className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('description')}`}
+                      className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('description')}`}
                     />
                   </div>
                 </div>
 
+                {/* Late threshold */}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
+                  <label className="block text-sm font-medium text-slate-900 dark:text-white">Late Threshold</label>
+                  <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+                    Minutes after the start time before a check-in counts as late. With a{' '}
+                    {form.event_time || '08:30'} start and{' '}
+                    {form.late_threshold_minutes || '20'} minutes, anyone scanned in from{' '}
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      {addMinutes(form.event_time, form.late_threshold_minutes)}
+                    </span>{' '}
+                    onwards is late.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={720}
+                      value={form.late_threshold_minutes}
+                      onChange={(e) => {
+                        setForm({ ...form, late_threshold_minutes: e.target.value })
+                        clearError('late_threshold_minutes')
+                      }}
+                      className={`w-28 rounded-xl border px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('late_threshold_minutes')}`}
+                    />
+                    <span className="text-sm text-slate-500 dark:text-slate-400">minutes</span>
+                  </div>
+                  {fieldErrors.late_threshold_minutes && (
+                    <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">
+                      Enter a whole number between 0 and 720.
+                    </p>
+                  )}
+                </div>
+
                 {/* Attendance required toggle */}
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Attendance Required</p>
-                    <p className="text-xs text-slate-500">Students will see this is mandatory on their dashboard.</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Attendance Required</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Students will see this is mandatory on their dashboard.</p>
                   </div>
                   <button
                     type="button"
@@ -339,17 +397,42 @@ export default function AdminEventFormPage() {
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-slate-900 shadow transition ${
                         form.attendance_required ? 'left-5' : 'left-0.5'
                       }`}
                     />
                   </button>
                 </div>
 
+                {/* Survey required toggle */}
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Post-Event Survey Required</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Students who check out must submit a survey - shown as "Attendance Pending" until they do.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.survey_required}
+                    onClick={() => setForm({ ...form, survey_required: !form.survey_required })}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                      form.survey_required ? 'bg-sky-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-slate-900 shadow transition ${
+                        form.survey_required ? 'left-5' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+
                 {/* Excused year levels */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-sm font-medium text-slate-900">Excused Year Levels</p>
-                  <p className="mb-3 text-xs text-slate-500">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">Excused Year Levels</p>
+                  <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
                     Students in these year levels are not required to register or attend this
                     event and will be marked EXCUSED instead of absent.
                   </p>
@@ -364,7 +447,7 @@ export default function AdminEventFormPage() {
                           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                             active
                               ? 'border-sky-500 bg-sky-600 text-white'
-                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                           }`}
                         >
                           Year {year}
@@ -377,7 +460,7 @@ export default function AdminEventFormPage() {
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={handleCancel}
-                    className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                    className="rounded-xl border border-slate-200 dark:border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     Cancel
                   </button>

@@ -8,22 +8,22 @@ export interface AdminSummary {
 }
 
 export function getAdminToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  return sessionStorage.getItem(TOKEN_KEY)
 }
 
 export function getAdminUser(): AdminSummary | null {
-  const raw = localStorage.getItem(ADMIN_KEY)
+  const raw = sessionStorage.getItem(ADMIN_KEY)
   return raw ? JSON.parse(raw) : null
 }
 
 export function setAdminSession(token: string, admin: AdminSummary) {
-  localStorage.setItem(TOKEN_KEY, token)
-  localStorage.setItem(ADMIN_KEY, JSON.stringify(admin))
+  sessionStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.setItem(ADMIN_KEY, JSON.stringify(admin))
 }
 
 export function clearAdminSession() {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(ADMIN_KEY)
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(ADMIN_KEY)
 }
 
 /**
