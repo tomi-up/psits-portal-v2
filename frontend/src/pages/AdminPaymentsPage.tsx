@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, X, RefreshCw, QrCode } from 'lucide-react'
+import { Check, X, QrCode } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction, confirmActionWithReason } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
 import AdminProfileMenu from '@/components/AdminProfileMenu'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import EmptyState from '@/components/EmptyState'
+import ImageUploadField from '@/components/ImageUploadField'
 import { adminFetch } from '@/lib/adminAuth'
 import { API } from '@/lib/apiBase'
 
@@ -82,9 +83,8 @@ export default function AdminPaymentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
-  async function loadPayments(isRefresh = false) {
-    if (isRefresh) setRefreshing(true)
-    else setLoading(true)
+  async function loadPayments(background = false) {
+    if (!background) setLoading(true)
     try {
       const query = statusFilter === 'ALL' ? '' : `?status_filter=${statusFilter}`
       const res = await adminFetch(`${API}/officer/payments/${query}`)
@@ -92,8 +92,7 @@ export default function AdminPaymentsPage() {
     } catch {
       notify.error('Network error', 'Could not load payments.')
     } finally {
-      if (isRefresh) setRefreshing(false)
-      else setLoading(false)
+      if (!background) setLoading(false)
     }
   }
 
@@ -106,15 +105,24 @@ export default function AdminPaymentsPage() {
     }
   }
 
-  async function loadBalances() {
-    setBalancesLoading(true)
+  async function loadBalances(background = false) {
+    if (!background) setBalancesLoading(true)
     try {
       const res = await adminFetch(`${API}/officer/balances/`)
       if (res.ok) setBalances((await res.json()).balances)
     } catch {
       notify.error('Network error', 'Could not load student balances.')
     } finally {
-      setBalancesLoading(false)
+      if (!background) setBalancesLoading(false)
+    }
+  }
+
+  async function refreshAll() {
+    setRefreshing(true)
+    try {
+      await Promise.all([loadPayments(true), loadBalances(true), loadQrSetting()])
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -235,7 +243,7 @@ export default function AdminPaymentsPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar
         title="PSITS Admin"
         open={menuOpen}
@@ -244,45 +252,48 @@ export default function AdminPaymentsPage() {
       />
 
       <div className="lg:pl-64">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-4 lg:px-10">
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMenuOpen(true)} />
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">Membership Ledger</h1>
-              <p className="text-sm text-slate-500">Review student payment submissions</p>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Membership Ledger</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Review student payment submissions</p>
             </div>
           </div>
-          <AdminProfileMenu />
+          <AdminProfileMenu
+            onRefresh={refreshAll}
+            refreshing={refreshing}
+            refreshDisabled={loading || balancesLoading}
+          />
         </header>
 
         <main className="px-6 py-8 lg:px-10">
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+          <div className="mb-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
             <div className="flex items-center gap-2">
-              <QrCode className="h-4 w-4 text-slate-500" />
-              <h2 className="text-sm font-semibold text-slate-900">Payment QR Code</h2>
+              <QrCode className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Payment QR Code</h2>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              The image URL shown to students when they pay their membership fee.
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              The QR image shown to students when they pay their membership fee.
             </p>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                type="text"
+            <div className="mt-3 max-w-sm">
+              <ImageUploadField
+                label="QR image"
                 value={qrImageUrl}
-                onChange={(e) => setQrImageUrl(e.target.value)}
-                placeholder="https://... QR code image URL"
-                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                purpose="payment-qr"
+                onChange={setQrImageUrl}
+                previewClassName="h-36 w-36"
               />
+            </div>
+            <div className="mt-3 flex justify-end">
               <button
                 onClick={handleSaveQr}
                 disabled={savingQr}
                 className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
               >
-                {savingQr ? 'Saving...' : 'Save'}
+                {savingQr ? 'Saving...' : 'Save QR'}
               </button>
             </div>
-            {qrImageUrl && (
-              <img src={qrImageUrl} alt="Payment QR preview" className="mt-3 h-32 w-32 rounded-lg object-contain" />
-            )}
           </div>
 
           <div className="mb-4 flex gap-2">
@@ -290,8 +301,8 @@ export default function AdminPaymentsPage() {
               onClick={() => setTab('submissions')}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                 tab === 'submissions'
-                  ? 'bg-slate-900 text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'bg-slate-900 text-white dark:bg-sky-600'
+                  : 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:shadow-none dark:hover:bg-slate-700'
               }`}
             >
               Submissions
@@ -300,8 +311,8 @@ export default function AdminPaymentsPage() {
               onClick={() => setTab('balances')}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                 tab === 'balances'
-                  ? 'bg-slate-900 text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  ? 'bg-slate-900 text-white dark:bg-sky-600'
+                  : 'border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:shadow-none dark:hover:bg-slate-700'
               }`}
             >
               Student Balances
@@ -309,15 +320,15 @@ export default function AdminPaymentsPage() {
           </div>
 
           {tab === 'submissions' && (
-          <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4">
               <div className="flex gap-2">
                 <button
                   onClick={() => setStatusFilter('PENDING')}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                     statusFilter === 'PENDING'
                       ? 'bg-sky-600 text-white'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                   }`}
                 >
                   Pending
@@ -327,27 +338,19 @@ export default function AdminPaymentsPage() {
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                     statusFilter === 'ALL'
                       ? 'bg-sky-600 text-white'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                   }`}
                 >
                   All
                 </button>
               </div>
-              <button
-                onClick={() => loadPayments(true)}
-                disabled={refreshing || loading}
-                title="Refresh"
-                className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
             </div>
 
             {loading ? (
               <div className="space-y-3 p-5">
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : sorted.length === 0 ? (
               <EmptyState
@@ -356,7 +359,7 @@ export default function AdminPaymentsPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <thead className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="px-5 py-3">Student</th>
                       <th className="px-5 py-3">Term</th>
@@ -369,30 +372,30 @@ export default function AdminPaymentsPage() {
                   </thead>
                   <tbody>
                     {sorted.map((p) => (
-                      <tr key={p.id} className="border-b border-slate-50 last:border-0">
+                      <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="px-5 py-3">
-                          <p className="font-medium text-slate-900">{p.student_name}</p>
-                          <p className="text-xs text-slate-400">{p.student_id}</p>
+                          <p className="font-medium text-slate-900 dark:text-white">{p.student_name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">{p.student_id}</p>
                         </td>
-                        <td className="px-5 py-3 text-slate-700">
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                           {semesterLabel(p.semester)} {p.school_year}
                         </td>
-                        <td className="px-5 py-3 text-slate-600">{p.reference_number}</td>
-                        <td className="px-5 py-3 font-medium text-slate-900">{peso(p.amount)}</td>
-                        <td className="px-5 py-3 text-slate-500">
+                        <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{p.reference_number}</td>
+                        <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">{peso(p.amount)}</td>
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
                           {new Date(p.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                         </td>
                         <td className="px-5 py-3">
                           {p.status === 'PENDING' ? (
-                            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+                            <span className="rounded-full bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 text-xs font-medium text-sky-700 dark:text-sky-400">
                               Pending
                             </span>
                           ) : p.status === 'APPROVED' ? (
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                               Approved
                             </span>
                           ) : (
-                            <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">
+                            <span className="rounded-full bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-xs font-medium text-rose-700 dark:text-rose-400">
                               Rejected
                             </span>
                           )}
@@ -418,12 +421,12 @@ export default function AdminPaymentsPage() {
                               </button>
                             </div>
                           ) : (
-                            <div className="text-right text-xs text-slate-400">
+                            <div className="text-right text-xs text-slate-400 dark:text-slate-500">
                               {p.reviewed_at && (
                                 <p>{new Date(p.reviewed_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
                               )}
                               {p.rejection_reason && (
-                                <p className="mt-0.5 italic text-rose-500">{p.rejection_reason}</p>
+                                <p className="mt-0.5 italic text-rose-500 dark:text-rose-400">{p.rejection_reason}</p>
                               )}
                             </div>
                           )}
@@ -438,31 +441,23 @@ export default function AdminPaymentsPage() {
           )}
 
           {tab === 'balances' && (
-          <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
-              <p className="text-sm text-slate-500">Record a payment directly - e.g. cash paid in person.</p>
-              <button
-                onClick={() => loadBalances()}
-                disabled={balancesLoading}
-                title="Refresh"
-                className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${balancesLoading ? 'animate-spin' : ''}`} />
-              </button>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="border-b border-slate-100 p-4 dark:border-slate-800">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Record a payment directly - e.g. cash paid in person.</p>
             </div>
 
             {balancesLoading ? (
               <div className="space-y-3 p-5">
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : balances.length === 0 ? (
               <EmptyState title="No membership dues on record yet." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <thead className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="px-5 py-3">Student</th>
                       <th className="px-5 py-3">Term</th>
@@ -475,35 +470,35 @@ export default function AdminPaymentsPage() {
                   </thead>
                   <tbody>
                     {balances.map((row) => (
-                      <tr key={row.fee_id} className="border-b border-slate-50 last:border-0">
+                      <tr key={row.fee_id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="px-5 py-3">
-                          <p className="font-medium text-slate-900">{row.student_name}</p>
-                          <p className="text-xs text-slate-400">{row.student_id}</p>
+                          <p className="font-medium text-slate-900 dark:text-white">{row.student_name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">{row.student_id}</p>
                         </td>
-                        <td className="px-5 py-3 text-slate-700">
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                           {semesterLabel(row.semester)} {row.school_year}
                         </td>
-                        <td className="px-5 py-3 text-slate-700">{peso(row.amount_due)}</td>
-                        <td className="px-5 py-3 text-slate-700">{peso(row.amount_paid)}</td>
-                        <td className="px-5 py-3 font-medium text-slate-900">{peso(row.balance)}</td>
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{peso(row.amount_due)}</td>
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{peso(row.amount_paid)}</td>
+                        <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">{peso(row.balance)}</td>
                         <td className="px-5 py-3">
                           {row.status === 'PAID' ? (
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                               Paid
                             </span>
                           ) : row.status === 'PARTIAL' ? (
-                            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                               Partial
                             </span>
                           ) : (
-                            <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">
+                            <span className="rounded-full bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-xs font-medium text-rose-700 dark:text-rose-400">
                               Unpaid
                             </span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-right">
                           {row.status === 'PAID' ? (
-                            <span className="text-xs text-slate-400">—</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
                           ) : (
                             <button
                               onClick={() => openRecordForm(row)}
@@ -530,35 +525,35 @@ export default function AdminPaymentsPage() {
           onClick={() => setRecordFor(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-slate-900">Record Payment</h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Record Payment</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {recordFor.student_name} · {semesterLabel(recordFor.semester)} {recordFor.school_year} · Balance:{' '}
               {peso(recordFor.balance)}
             </p>
 
             <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Amount</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Amount</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={recordAmount}
                   onChange={(e) => setRecordAmount(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Note (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Note (optional)</label>
                 <input
                   type="text"
                   value={recordNote}
                   onChange={(e) => setRecordNote(e.target.value)}
                   placeholder="e.g. Cash paid in person"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                 />
               </div>
               <button
@@ -572,7 +567,7 @@ export default function AdminPaymentsPage() {
 
             <button
               onClick={() => setRecordFor(null)}
-              className="mt-3 w-full rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Cancel
             </button>

@@ -14,6 +14,8 @@ from app.models.student import Student, StudentSchoolYear
 from app.models.user import Profile, AccountStatus
 from app.models.audit_log import AuditLog
 from app.models.balance import MembershipFee
+from app.models.survey import SurveyResponse
+from app.models.attendance_review import AttendanceReviewRequest
 from app.core.config import settings
 from app.core.crypto import (
     encrypt_activation_token,
@@ -607,6 +609,31 @@ def get_student_dashboard(
         ).all()
     }
 
+    survey_submitted_event_ids = {
+        r.event_id for r in db.query(SurveyResponse).filter(SurveyResponse.student_id == student.id).all()
+    }
+
+    def _survey_status(event: Event, time_out) -> str | None:
+        if not event.survey_required:
+            return None
+        if event.id in survey_submitted_event_ids:
+            return "SUBMITTED"
+        return "PENDING" if time_out else None
+
+    # Most recent request per event, in case a REJECTED one was followed by a
+    # resubmission - same "first one wins, newest first" pattern as excuse
+    # requests above.
+    review_status_by_event: dict[str, str] = {}
+    review_rejection_reason_by_event: dict[str, str | None] = {}
+    for req in (
+        db.query(AttendanceReviewRequest)
+        .filter(AttendanceReviewRequest.student_id == student.id)
+        .order_by(AttendanceReviewRequest.created_at.desc())
+        .all()
+    ):
+        review_status_by_event.setdefault(req.event_id, req.status)
+        review_rejection_reason_by_event.setdefault(req.event_id, req.rejection_reason)
+
     # Archived, mandatory events this student never even registered for - surfaced
     # so skipping registration entirely isn't invisible on their own history too.
     missed_required_events = (
@@ -638,7 +665,10 @@ def get_student_dashboard(
                 "time_in": as_utc(record.time_in).isoformat() if record.time_in else None,
                 "time_out": as_utc(record.time_out).isoformat() if record.time_out else None,
                 "status": finalize_status(record.status, event.status),
-                "is_late": is_late(record.time_in, event.event_date),
+                "is_late": is_late(record.time_in, event.event_date, event.late_threshold_minutes),
+                "survey_status": _survey_status(event, record.time_out),
+                "review_status": review_status_by_event.get(event.id),
+                "review_rejection_reason": review_rejection_reason_by_event.get(event.id),
             }
             for record, event in attendance_rows
         ] + [
@@ -649,6 +679,9 @@ def get_student_dashboard(
                 "time_out": None,
                 "status": "EXCUSED" if year_level in (event.excused_year_levels or []) else "NOT_REGISTERED",
                 "is_late": False,
+                "survey_status": None,
+                "review_status": None,
+                "review_rejection_reason": None,
             }
             for event in missed_required_events
         ],

@@ -7,7 +7,7 @@ from app.models.base import BaseModel
 
 
 class MembershipFee(BaseModel):
-    """A single semester's membership due for one student. Fixed at 200
+    """A single semester's membership due for one student. Fixed at 100
     pesos per semester for now - amount_due is still stored per-row (rather
     than assumed) so a future fee change doesn't rewrite history."""
 
@@ -16,7 +16,7 @@ class MembershipFee(BaseModel):
     student_id = Column(String(36), ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
     school_year_id = Column(String(36), ForeignKey("school_years.id", ondelete="CASCADE"), nullable=False)
     semester = Column(String(10), nullable=False)  # "1ST" or "2ND"
-    amount_due = Column(Numeric(10, 2), nullable=False, default=200)
+    amount_due = Column(Numeric(10, 2), nullable=False, default=100)
     amount_paid = Column(Numeric(10, 2), nullable=False, default=0)
 
     student = relationship("Student")

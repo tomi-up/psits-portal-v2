@@ -1,12 +1,19 @@
 #!/usr/bin/env python
-import bcrypt
+"""Interactively create a bcrypt hash without storing or echoing a password."""
 
-pwd = 'USMPsits@2026'
-pwd_bytes = pwd.encode('utf-8')
-print(f'Password: {pwd}')
-print(f'Password bytes: {len(pwd_bytes)}')
+from getpass import getpass
 
-salt = bcrypt.gensalt(rounds=12)
-hashed = bcrypt.hashpw(pwd_bytes, salt)
-print(f'Bcrypt hash: {hashed.decode("utf-8")}')
-print(f'Hash length: {len(hashed.decode("utf-8"))}')
+from app.core.security import hash_password
+
+
+def main() -> None:
+    password = getpass("Password: ")
+    confirmation = getpass("Confirm password: ")
+    if password != confirmation:
+        raise SystemExit("Passwords do not match")
+
+    print(hash_password(password))
+
+
+if __name__ == "__main__":
+    main()

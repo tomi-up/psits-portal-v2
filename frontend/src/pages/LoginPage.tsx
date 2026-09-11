@@ -69,8 +69,8 @@ export default function LoginPage() {
 
       setBindError(null)
       setLoginError(null)
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      sessionStorage.setItem('access_token', data.access_token)
+      sessionStorage.setItem('user', JSON.stringify(data.user))
       notify.success('Welcome back', `Signed in as ${data.user.name}`)
       navigate('/dashboard', { replace: true })
     } catch {

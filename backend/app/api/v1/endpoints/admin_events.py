@@ -5,6 +5,8 @@ route on this router requires a valid `Authorization: Bearer <token>` from
 POST /api/v1/admin/auth/login.
 """
 
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
@@ -13,16 +15,65 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.attendance import as_utc, is_late as _is_late, finalize_status
+from app.core.checkpoints import (
+    PHASE_ACTION_LABELS,
+    PHASE_LABELS,
+    next_phase as _next_phase,
+    uses_checkpoints,
+)
 from app.core.deps import get_current_admin
+from app.models.admin import AdminAccount
 from app.models.event import Event, EventRegistration, Attendance
+from app.models.officer import EventAttendancePhaseLog
 from app.models.student import Student, StudentSchoolYear
+from app.models.survey import SurveyResponse
 from app.services.attendance_export import build_attendance_workbook, safe_filename
+from app.services.checkpoint_attendance import checkpoints_by_student
+from app.services.survey_export import build_survey_results_workbook
 
 router = APIRouter(prefix="/officer/events", tags=["admin-events"], dependencies=[Depends(get_current_admin)])
 
 
 VALID_STATUSES = {"DRAFT", "ACTIVE", "ARCHIVED"}
 VALID_YEAR_LEVELS = {1, 2, 3, 4}
+
+# Ambiguous glyphs left out - this gets read off a screen and typed into a
+# phone in a crowded venue, so 0/O and 1/I/L are more trouble than the extra
+# entropy is worth.
+_EVENT_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+EVENT_CODE_LENGTH = 6
+
+MIN_LATE_THRESHOLD_MINUTES = 0
+MAX_LATE_THRESHOLD_MINUTES = 12 * 60
+
+
+def _generate_event_code(db: Session) -> str:
+    """A short unique code officers type on the scanner login screen."""
+    for _ in range(20):
+        code = "".join(secrets.choice(_EVENT_CODE_ALPHABET) for _ in range(EVENT_CODE_LENGTH))
+        if not db.query(Event).filter(Event.event_code == code).first():
+            return code
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Could not generate a unique event code, please try again",
+    )
+
+
+def _validate_late_threshold(value: int) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Late threshold must be a whole number of minutes",
+        )
+    if not (MIN_LATE_THRESHOLD_MINUTES <= value <= MAX_LATE_THRESHOLD_MINUTES):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Late threshold must be between {MIN_LATE_THRESHOLD_MINUTES} and "
+                f"{MAX_LATE_THRESHOLD_MINUTES} minutes"
+            ),
+        )
+    return value
 
 
 def _normalize_excused_year_levels(value: list[int] | None) -> list[int] | None:
@@ -46,6 +97,8 @@ class EventCreateRequest(BaseModel):
     cover_image_url: str | None = None
     attendance_required: bool = False
     excused_year_levels: list[int] | None = None
+    survey_required: bool = False
+    late_threshold_minutes: int = 20
 
 
 class EventUpdateRequest(BaseModel):
@@ -57,6 +110,8 @@ class EventUpdateRequest(BaseModel):
     cover_image_url: str | None = None
     attendance_required: bool = False
     excused_year_levels: list[int] | None = None
+    survey_required: bool = False
+    late_threshold_minutes: int = 20
 
 
 class EventAdminResponse(BaseModel):
@@ -69,6 +124,10 @@ class EventAdminResponse(BaseModel):
     status: str
     attendance_required: bool
     excused_year_levels: list[int] | None
+    survey_required: bool
+    late_threshold_minutes: int
+    event_code: str | None
+    attendance_phase: str
     created_at: datetime
 
     class Config:
@@ -103,6 +162,10 @@ def create_event(request: EventCreateRequest, db: Session = Depends(get_db)):
         cover_image_url=request.cover_image_url,
         attendance_required=request.attendance_required,
         excused_year_levels=_normalize_excused_year_levels(request.excused_year_levels),
+        survey_required=request.survey_required,
+        late_threshold_minutes=_validate_late_threshold(request.late_threshold_minutes),
+        event_code=_generate_event_code(db),
+        attendance_phase="NOT_STARTED",
         is_active=request.status == "ACTIVE",
     )
     db.add(event)
@@ -128,7 +191,14 @@ def update_event(event_id: str, request: EventUpdateRequest, db: Session = Depen
     event.cover_image_url = request.cover_image_url
     event.attendance_required = request.attendance_required
     event.excused_year_levels = _normalize_excused_year_levels(request.excused_year_levels)
+    event.survey_required = request.survey_required
+    event.late_threshold_minutes = _validate_late_threshold(request.late_threshold_minutes)
     event.is_active = request.status == "ACTIVE"
+
+    # Backfill for events created before event codes existed, so an organiser
+    # can turn on checkpoint scanning for an old event without a migration.
+    if not event.event_code:
+        event.event_code = _generate_event_code(db)
 
     db.commit()
     db.refresh(event)
@@ -149,8 +219,22 @@ class RegistrationRow(BaseModel):
     registered_at: datetime | None  # None for a NOT_REGISTERED/NOT_REQUIRED row - they never registered
     time_in: datetime | None
     time_out: datetime | None
-    status: str  # NO_SHOW, INCOMPLETE, PRESENT, ABSENT, NOT_REGISTERED, or EXCUSED
+    # NO_SHOW, INCOMPLETE, PRESENT, ABSENT, NOT_REGISTERED, EXCUSED, and -
+    # on 3-checkpoint events only - LATE and FOR_REVIEW.
+    status: str
     is_late: bool
+    survey_status: str | None  # PENDING, SUBMITTED, or None if no survey applies
+    # Which checkpoints this student was actually scanned at. Empty on a
+    # legacy two-scan event, which is exactly how the UI knows not to show
+    # the checkpoint columns at all.
+    checkpoints: list[str]
+
+
+class PhaseLogEntry(BaseModel):
+    previous_phase: str
+    new_phase: str
+    changed_by_name: str | None
+    changed_at: datetime
 
 
 class EventRegistrationsResponse(BaseModel):
@@ -158,6 +242,14 @@ class EventRegistrationsResponse(BaseModel):
     event_name: str
     event_date: datetime | None
     event_status: str  # DRAFT, ACTIVE, or ARCHIVED - ARCHIVED means attendance is finalized
+    survey_required: bool
+    event_code: str | None
+    attendance_phase: str
+    attendance_phase_label: str
+    next_phase: str | None
+    next_phase_label: str | None
+    uses_checkpoints: bool
+    late_threshold_minutes: int
     total_registered: int
     total_present: int
     total_incomplete: int
@@ -166,6 +258,8 @@ class EventRegistrationsResponse(BaseModel):
     total_not_registered: int
     total_excused: int
     total_late: int
+    total_late_status: int   # status == LATE (missed the IN checkpoint)
+    total_for_review: int    # status == FOR_REVIEW (ambiguous scan pattern)
     registrations: list[RegistrationRow]
 
 
@@ -184,6 +278,14 @@ def _latest_school_years(db: Session) -> dict[str, StudentSchoolYear]:
     for row in rows:
         latest.setdefault(row.student_id, row)
     return latest
+
+
+def _ordered_checkpoints(scanned: set[str] | None) -> list[str]:
+    """Always IN, MIDDLE, OUT order - a set's iteration order is not a thing
+    the UI or the Excel export should be at the mercy of."""
+    if not scanned:
+        return []
+    return [c for c in ("IN", "MIDDLE", "OUT") if c in scanned]
 
 
 def build_event_registrations(db: Session, event: Event) -> EventRegistrationsResponse:
@@ -220,6 +322,20 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
 
     school_years_by_student = _latest_school_years(db)
     excused_year_levels = set(event.excused_year_levels or [])
+    checkpoints = checkpoints_by_student(db, event.id)
+
+    survey_submitted_ids = set()
+    if event.survey_required:
+        survey_submitted_ids = {
+            r.student_id for r in db.query(SurveyResponse).filter(SurveyResponse.event_id == event.id).all()
+        }
+
+    def _survey_status(student_id: str, checked_out: bool) -> str | None:
+        if not event.survey_required:
+            return None
+        if student_id in survey_submitted_ids:
+            return "SUBMITTED"
+        return "PENDING" if checked_out else None
 
     rows = []
     for reg in registrations:
@@ -247,7 +363,13 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
                 time_in=as_utc(attendance.time_in) if attendance else None,
                 time_out=as_utc(attendance.time_out) if attendance else None,
                 status=row_status,
-                is_late=_is_late(attendance.time_in if attendance else None, event.event_date),
+                is_late=_is_late(
+                    attendance.time_in if attendance else None,
+                    event.event_date,
+                    event.late_threshold_minutes,
+                ),
+                survey_status=_survey_status(student.id, bool(attendance and attendance.time_out)),
+                checkpoints=_ordered_checkpoints(checkpoints.get(student.id)),
             )
         )
 
@@ -290,8 +412,12 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
                     time_out=None,
                     status=not_registered_status,
                     is_late=False,
+                    survey_status=None,
+                    checkpoints=[],
                 )
             )
+
+    upcoming = _next_phase(event.attendance_phase)
 
     return EventRegistrationsResponse(
         event_id=event.id,
@@ -301,6 +427,14 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
         # as_utc() or it gets mislabeled and shifts by 8 hours downstream.
         event_date=event.event_date,
         event_status=event.status,
+        survey_required=event.survey_required,
+        event_code=event.event_code,
+        attendance_phase=event.attendance_phase,
+        attendance_phase_label=PHASE_LABELS.get(event.attendance_phase, event.attendance_phase),
+        next_phase=upcoming,
+        next_phase_label=PHASE_ACTION_LABELS.get(event.attendance_phase),
+        uses_checkpoints=uses_checkpoints(event.attendance_phase),
+        late_threshold_minutes=event.late_threshold_minutes,
         total_registered=total_registered,
         total_present=sum(1 for r in rows if r.status == "PRESENT"),
         total_incomplete=sum(1 for r in rows if r.status == "INCOMPLETE"),
@@ -309,6 +443,8 @@ def build_event_registrations(db: Session, event: Event) -> EventRegistrationsRe
         total_not_registered=sum(1 for r in rows if r.status == "NOT_REGISTERED"),
         total_excused=sum(1 for r in rows if r.status == "EXCUSED"),
         total_late=sum(1 for r in rows if r.is_late),
+        total_late_status=sum(1 for r in rows if r.status == "LATE"),
+        total_for_review=sum(1 for r in rows if r.status == "FOR_REVIEW"),
         registrations=rows,
     )
 
@@ -337,6 +473,232 @@ def export_event_registrations(event_id: str, db: Session = Depends(get_db)):
 
     workbook_bytes = build_attendance_workbook(data)
     filename = safe_filename(f"PSITS_Attendance_{event.name}.xlsx")
+
+    return StreamingResponse(
+        workbook_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ============================================================================
+# ATTENDANCE PHASE CONTROL
+# ============================================================================
+
+class AttendancePhaseResponse(BaseModel):
+    event_id: str
+    attendance_phase: str
+    attendance_phase_label: str
+    current_checkpoint: str | None
+    next_phase: str | None
+    next_phase_label: str | None
+    history: list[PhaseLogEntry]
+
+
+class AttendancePhaseAdvanceRequest(BaseModel):
+    """The phase being moved to, echoed back by the client.
+
+    Required rather than a bare "advance" so that two admins hammering the
+    button at the same moment can't double-advance the event past a checkpoint
+    nobody actually ran - the second request names a phase that is no longer
+    next, and is refused.
+    """
+    next_phase: str
+
+
+def _phase_response(db: Session, event: Event) -> AttendancePhaseResponse:
+    from app.core.checkpoints import active_checkpoint
+
+    history = (
+        db.query(EventAttendancePhaseLog)
+        .filter(EventAttendancePhaseLog.event_id == event.id)
+        .order_by(EventAttendancePhaseLog.changed_at.desc())
+        .all()
+    )
+
+    return AttendancePhaseResponse(
+        event_id=event.id,
+        attendance_phase=event.attendance_phase,
+        attendance_phase_label=PHASE_LABELS.get(event.attendance_phase, event.attendance_phase),
+        current_checkpoint=active_checkpoint(event.attendance_phase),
+        next_phase=_next_phase(event.attendance_phase),
+        next_phase_label=PHASE_ACTION_LABELS.get(event.attendance_phase),
+        history=[
+            PhaseLogEntry(
+                previous_phase=h.previous_phase,
+                new_phase=h.new_phase,
+                changed_by_name=h.changed_by_name,
+                changed_at=as_utc(h.changed_at),
+            )
+            for h in history
+        ],
+    )
+
+
+@router.get("/{event_id}/attendance-phase", response_model=AttendancePhaseResponse)
+def get_attendance_phase(event_id: str, db: Session = Depends(get_db)):
+    event = _get_event_or_404(db, event_id)
+    return _phase_response(db, event)
+
+
+@router.post("/{event_id}/attendance-phase", response_model=AttendancePhaseResponse)
+async def advance_attendance_phase(
+    event_id: str,
+    body: AttendancePhaseAdvanceRequest,
+    db: Session = Depends(get_db),
+    admin: AdminAccount = Depends(get_current_admin),
+):
+    """Move the event one step along IN -> MIDDLE -> OUT -> CLOSED.
+
+    Manual on purpose, and manual at every step. The organiser opens MIDDLE
+    when the programme actually reaches a point where sweeping the room makes
+    sense - which is not a time anybody can put in a form three weeks earlier,
+    because the guest speaker will still be talking.
+
+    Forward-only: there is no way through this endpoint to reopen a closed
+    checkpoint. Reopening IN after seeing who missed it is precisely the fraud
+    the three-checkpoint design exists to prevent.
+    """
+    event = _get_event_or_404(db, event_id)
+
+    allowed = _next_phase(event.attendance_phase)
+    if allowed is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Attendance is already {PHASE_LABELS.get(event.attendance_phase, event.attendance_phase)} and cannot be advanced further",
+        )
+
+    requested = body.next_phase.strip().upper()
+    if requested != allowed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot move from {event.attendance_phase} to {requested}. "
+                f"The only allowed next phase is {allowed}."
+            ),
+        )
+
+    previous = event.attendance_phase
+    event.attendance_phase = allowed
+
+    db.add(
+        EventAttendancePhaseLog(
+            event_id=event.id,
+            previous_phase=previous,
+            new_phase=allowed,
+            changed_by=admin.id,
+            changed_by_name=admin.display_name,
+        )
+    )
+    db.commit()
+    db.refresh(event)
+
+    # Push to anyone watching this event - the admin registrations table, and
+    # any scanner holding an open socket. Scanners also poll GET
+    # /scanner/session, so a dropped socket degrades to a short delay rather
+    # than an officer scanning into a closed checkpoint.
+    from app.api.v1.endpoints.events_mvp import attendance_ws_manager
+
+    await attendance_ws_manager.broadcast(
+        event.id, {"type": "phase_changed", "attendance_phase": allowed}
+    )
+
+    return _phase_response(db, event)
+
+
+class SurveyQuestionResult(BaseModel):
+    id: str
+    text: str
+    average: float | None
+    responses: int
+
+
+class SurveySectionResult(BaseModel):
+    title: str
+    questions: list[SurveyQuestionResult]
+
+
+class SurveyCommentEntry(BaseModel):
+    student_id: str
+    student_name: str
+    comment: str
+    submitted_at: datetime
+
+
+class SurveyResultsResponse(BaseModel):
+    event_id: str
+    event_name: str
+    survey_required: bool
+    total_responses: int
+    total_eligible: int  # checked-out attendees who could be asked to respond
+    sections: list[SurveySectionResult]
+    comments: list[SurveyCommentEntry]
+
+
+def build_survey_results(db: Session, event: Event) -> SurveyResultsResponse:
+    """Shared by the results endpoint and its Excel export, so the two can
+    never drift apart - same pattern as build_event_registrations above."""
+    from app.core.survey_questions import SURVEY_SECTIONS
+
+    responses = (
+        db.query(SurveyResponse)
+        .options(joinedload(SurveyResponse.student))
+        .filter(SurveyResponse.event_id == event.id)
+        .order_by(SurveyResponse.submitted_at.desc())
+        .all()
+    )
+
+    total_eligible = db.query(Attendance).filter(
+        Attendance.event_id == event.id, Attendance.time_out.isnot(None)
+    ).count()
+
+    sections = []
+    for section in SURVEY_SECTIONS:
+        questions = []
+        for q in section["questions"]:
+            values = [r.answers.get(q["id"]) for r in responses if isinstance(r.answers.get(q["id"]), (int, float))]
+            questions.append(SurveyQuestionResult(
+                id=q["id"], text=q["text"],
+                average=round(sum(values) / len(values), 2) if values else None,
+                responses=len(values),
+            ))
+        sections.append(SurveySectionResult(title=section["title"], questions=questions))
+
+    comments = [
+        SurveyCommentEntry(
+            student_id=r.student.student_id if r.student else "(deleted student)",
+            student_name=f"{r.student.first_name} {r.student.last_name}" if r.student else "(deleted student)",
+            comment=r.answers["comments"].strip(),
+            submitted_at=r.submitted_at,
+        )
+        for r in responses
+        if isinstance(r.answers.get("comments"), str) and r.answers["comments"].strip()
+    ]
+
+    return SurveyResultsResponse(
+        event_id=event.id,
+        event_name=event.name,
+        survey_required=event.survey_required,
+        total_responses=len(responses),
+        total_eligible=total_eligible,
+        sections=sections,
+        comments=comments,
+    )
+
+
+@router.get("/{event_id}/survey-results")
+def get_survey_results(event_id: str, db: Session = Depends(get_db)):
+    event = _get_event_or_404(db, event_id)
+    return build_survey_results(db, event)
+
+
+@router.get("/{event_id}/survey-results/export")
+def export_survey_results(event_id: str, db: Session = Depends(get_db)):
+    event = _get_event_or_404(db, event_id)
+    results = build_survey_results(db, event)
+
+    workbook_bytes = build_survey_results_workbook(results)
+    filename = safe_filename(f"PSITS_Survey_{event.name}.xlsx")
 
     return StreamingResponse(
         workbook_bytes,

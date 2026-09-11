@@ -36,7 +36,9 @@ REGISTRATION_LABELS = {
 
 STATUS_LABELS = {
     "PRESENT": "Present",
+    "LATE": "Late (missed IN)",
     "INCOMPLETE": "Incomplete",
+    "FOR_REVIEW": "For Review",
     "NO_SHOW": "No Show",
     "ABSENT": "Absent",
     "NOT_REGISTERED": "Not Registered",
@@ -45,9 +47,18 @@ STATUS_LABELS = {
 
 # Rendered in this order in both the summary block and the status column,
 # regardless of which ones actually occur for a given event.
-STATUS_ORDER = ["PRESENT", "INCOMPLETE", "NO_SHOW", "ABSENT", "NOT_REGISTERED", "EXCUSED"]
+STATUS_ORDER = [
+    "PRESENT",
+    "LATE",
+    "INCOMPLETE",
+    "FOR_REVIEW",
+    "NO_SHOW",
+    "ABSENT",
+    "NOT_REGISTERED",
+    "EXCUSED",
+]
 
-COLUMNS = [
+BASE_COLUMNS = [
     ("Student ID", 16),
     ("Last Name", 20),
     ("First Name", 20),
@@ -57,9 +68,20 @@ COLUMNS = [
     ("Section", 10),
     ("Registration Status", 18),
     ("Attendance Status", 18),
-    ("Time In", 12),
-    ("Time Out", 12),
 ]
+
+CHECKPOINT_COLUMNS = [("IN", 8), ("MIDDLE", 9), ("OUT", 8)]
+
+TIME_COLUMNS = [("Time In", 12), ("Time Out", 12)]
+
+
+def _columns(data: "EventRegistrationsResponse") -> list[tuple[str, int]]:
+    """Checkpoint columns appear only for events that actually ran the
+    3-checkpoint workflow - on a legacy two-scan event they would be three
+    empty columns telling the reader nothing."""
+    if getattr(data, "uses_checkpoints", False):
+        return BASE_COLUMNS + CHECKPOINT_COLUMNS + TIME_COLUMNS
+    return BASE_COLUMNS + TIME_COLUMNS
 
 THIN_BORDER = Border(*(Side(style="thin", color="B0B7C3") for _ in range(4)))
 HEADER_FILL = PatternFill("solid", fgColor="0F172A")
@@ -104,7 +126,7 @@ def _write_header(ws: Worksheet, data: "EventRegistrationsResponse") -> int:
     else:
         title_col = "A"
 
-    last_col = get_column_letter(len(COLUMNS))
+    last_col = get_column_letter(len(_columns(data)))
 
     ws.merge_cells(f"{title_col}1:{last_col}1")
     ws[f"{title_col}1"] = ORG_NAME
@@ -131,7 +153,7 @@ def _write_header(ws: Worksheet, data: "EventRegistrationsResponse") -> int:
 
 def _write_summary(ws: Worksheet, data: "EventRegistrationsResponse", start_row: int) -> int:
     row = start_row
-    last_col = get_column_letter(len(COLUMNS))
+    last_col = get_column_letter(len(_columns(data)))
 
     ws.merge_cells(f"A{row}:{last_col}{row}")
     ws[f"A{row}"] = "ATTENDANCE SUMMARY"
@@ -140,7 +162,9 @@ def _write_summary(ws: Worksheet, data: "EventRegistrationsResponse", start_row:
 
     counts = {
         "PRESENT": data.total_present,
+        "LATE": getattr(data, "total_late_status", 0),
         "INCOMPLETE": data.total_incomplete,
+        "FOR_REVIEW": getattr(data, "total_for_review", 0),
         "NO_SHOW": data.total_no_show,
         "ABSENT": data.total_absent,
         "NOT_REGISTERED": data.total_not_registered,
@@ -166,8 +190,9 @@ def _write_summary(ws: Worksheet, data: "EventRegistrationsResponse", start_row:
 
 
 def _write_table(ws: Worksheet, data: "EventRegistrationsResponse", start_row: int) -> None:
+    columns = _columns(data)
     header_row = start_row
-    for col_idx, (title, width) in enumerate(COLUMNS, start=1):
+    for col_idx, (title, width) in enumerate(columns, start=1):
         cell = ws.cell(row=header_row, column=col_idx, value=title)
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
@@ -175,8 +200,11 @@ def _write_table(ws: Worksheet, data: "EventRegistrationsResponse", start_row: i
         cell.border = THIN_BORDER
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 
+    show_checkpoints = len(columns) == len(BASE_COLUMNS) + len(CHECKPOINT_COLUMNS) + len(TIME_COLUMNS)
+
     for offset, r in enumerate(data.registrations, start=1):
         row = header_row + offset
+        scanned = set(getattr(r, "checkpoints", []) or [])
         values = [
             r.student_id,
             r.last_name,
@@ -187,6 +215,10 @@ def _write_table(ws: Worksheet, data: "EventRegistrationsResponse", start_row: i
             r.section or "—",
             REGISTRATION_LABELS.get(r.registration_status, r.registration_status),
             STATUS_LABELS.get(r.status, r.status),
+        ]
+        if show_checkpoints:
+            values += ["✓" if c in scanned else "—" for c, _ in CHECKPOINT_COLUMNS]
+        values += [
             _to_ph_time_str(r.time_in),
             _to_ph_time_str(r.time_out),
         ]
@@ -200,7 +232,7 @@ def _write_table(ws: Worksheet, data: "EventRegistrationsResponse", start_row: i
             )
 
     last_row = header_row + len(data.registrations)
-    last_col_letter = get_column_letter(len(COLUMNS))
+    last_col_letter = get_column_letter(len(columns))
     ws.auto_filter.ref = f"A{header_row}:{last_col_letter}{last_row}"
     ws.freeze_panes = f"A{header_row + 1}"
 

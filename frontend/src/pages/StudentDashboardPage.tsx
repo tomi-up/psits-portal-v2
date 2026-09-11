@@ -60,7 +60,7 @@ export default function StudentDashboardPage() {
   const [hasActiveSettlement, setHasActiveSettlement] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('user')
+    const stored = sessionStorage.getItem('user')
     if (!stored) {
       navigate('/login', { replace: true })
       return
@@ -114,8 +114,8 @@ export default function StudentDashboardPage() {
     })
     if (!confirmed) return
 
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user')
+    sessionStorage.removeItem('access_token')
+    sessionStorage.removeItem('user')
     navigate('/login', { replace: true })
   }
 

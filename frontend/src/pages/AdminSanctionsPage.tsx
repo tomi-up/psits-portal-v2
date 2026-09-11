@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, X, RefreshCw, Plus } from 'lucide-react'
+import { Check, X, Plus } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction, confirmActionWithReason } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
@@ -163,7 +163,7 @@ export default function AdminSanctionsPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar
         title="PSITS Admin"
         open={menuOpen}
@@ -172,27 +172,31 @@ export default function AdminSanctionsPage() {
       />
 
       <div className="lg:pl-64">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-4 lg:px-10">
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMenuOpen(true)} />
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">Sanctions</h1>
-              <p className="text-sm text-slate-500">Review donation submissions and log community service hours</p>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Sanctions</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Review donation submissions and log community service hours</p>
             </div>
           </div>
-          <AdminProfileMenu />
+          <AdminProfileMenu
+            onRefresh={() => loadSettlements(true)}
+            refreshing={refreshing}
+            refreshDisabled={loading}
+          />
         </header>
 
         <main className="px-6 py-8 lg:px-10">
-          <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4">
               <div className="flex gap-2">
                 <button
                   onClick={() => setStatusFilter('PENDING')}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                     statusFilter === 'PENDING'
                       ? 'bg-sky-600 text-white'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                   }`}
                 >
                   Pending
@@ -202,26 +206,18 @@ export default function AdminSanctionsPage() {
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                     statusFilter === 'ALL'
                       ? 'bg-sky-600 text-white'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                   }`}
                 >
                   All
                 </button>
               </div>
-              <button
-                onClick={() => loadSettlements(true)}
-                disabled={refreshing || loading}
-                title="Refresh"
-                className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
             </div>
 
             {loading ? (
               <div className="space-y-3 p-5">
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : sorted.length === 0 ? (
               <EmptyState
@@ -230,7 +226,7 @@ export default function AdminSanctionsPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <thead className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     <tr>
                       <th className="px-5 py-3">Student</th>
                       <th className="px-5 py-3">Type</th>
@@ -241,15 +237,15 @@ export default function AdminSanctionsPage() {
                   </thead>
                   <tbody>
                     {sorted.map((s) => (
-                      <tr key={s.id} className="border-b border-slate-50 last:border-0">
+                      <tr key={s.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="px-5 py-3">
-                          <p className="font-medium text-slate-900">{s.student_name}</p>
-                          <p className="text-xs text-slate-400">{s.student_id}</p>
+                          <p className="font-medium text-slate-900 dark:text-white">{s.student_name}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">{s.student_id}</p>
                         </td>
-                        <td className="px-5 py-3 text-slate-700">
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300">
                           {s.resolution_type === 'DONATION' ? 'Donation' : 'Community Service'}
                         </td>
-                        <td className="px-5 py-3 text-slate-600">
+                        <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                           {s.resolution_type === 'DONATION' ? (
                             <span>
                               {s.donation_quantity}x {s.donation_label}
@@ -259,7 +255,7 @@ export default function AdminSanctionsPage() {
                               <p className="text-xs">
                                 {s.community_service_hours_logged ?? 0} / {s.community_service_hours_required} hrs
                               </p>
-                              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                                 <div
                                   className="h-full rounded-full bg-sky-600"
                                   style={{
@@ -277,15 +273,15 @@ export default function AdminSanctionsPage() {
                         </td>
                         <td className="px-5 py-3">
                           {s.status === 'PENDING' ? (
-                            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+                            <span className="rounded-full bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 text-xs font-medium text-sky-700 dark:text-sky-400">
                               Pending
                             </span>
                           ) : s.status === 'APPROVED' || s.status === 'COMPLETED' ? (
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                               {s.status === 'COMPLETED' ? 'Completed' : 'Approved'}
                             </span>
                           ) : (
-                            <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">
+                            <span className="rounded-full bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-xs font-medium text-rose-700 dark:text-rose-400">
                               Rejected
                             </span>
                           )}
@@ -319,7 +315,7 @@ export default function AdminSanctionsPage() {
                                 placeholder="hrs"
                                 value={hoursInput[s.id] ?? ''}
                                 onChange={(e) => setHoursInput((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                                className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:border-sky-500 focus:outline-none"
+                                className="w-20 rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1.5 text-xs focus:border-sky-500 focus:outline-none"
                               />
                               <button
                                 onClick={() => handleLogHours(s)}
@@ -332,12 +328,12 @@ export default function AdminSanctionsPage() {
                               </button>
                             </div>
                           ) : (
-                            <div className="text-right text-xs text-slate-400">
+                            <div className="text-right text-xs text-slate-400 dark:text-slate-500">
                               {s.reviewed_at && (
                                 <p>{new Date(s.reviewed_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
                               )}
                               {s.rejection_reason && (
-                                <p className="mt-0.5 italic text-rose-500">{s.rejection_reason}</p>
+                                <p className="mt-0.5 italic text-rose-500 dark:text-rose-400">{s.rejection_reason}</p>
                               )}
                             </div>
                           )}

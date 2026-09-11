@@ -1,6 +1,6 @@
 # PSITS Portal V2 - TODO & Testing Guide
 
-Last updated: 2026-08-25
+Last updated: 2026-09-11
 
 ---
 
@@ -100,6 +100,45 @@ poetry run python -m app.scripts.init_db_simple
 ---
 
 ## Part 2: Remaining work
+
+### New Staging Database Setup
+
+> Creating a Supabase project or deploying the repository does not automatically
+> create the application's database structure. Do not run `init_db_mvp.py` on the
+> new database: it does not include all current models and it inserts test data.
+
+- [ ] Create a new Supabase free-tier project to serve as the future staging
+      environment
+- [ ] Add the new database connection, Supabase URL, anon key, and service-role
+      key directly to the local/deployment environment files; never commit keys
+- [ ] Confirm `ENVIRONMENT=staging` and verify that no production credentials are
+      mixed into the new staging configuration
+- [ ] Build a clean database bootstrap/migration command that imports every
+      current ORM model before running `Base.metadata.create_all`
+- [ ] Ensure the bootstrap includes all tables, relationships, foreign keys,
+      unique constraints, indexes, enums, and current columns
+- [ ] Keep the bootstrap separate from test/demo data seeding
+- [ ] Seed only required reference data: BSIT, BLIS, BSCS, BSINFOSYS, the active
+      school year, roles/permissions, and a staging admin account
+- [ ] Run `app.scripts.harden_public_rls` and verify RLS is enabled on every
+      application table
+- [ ] Verify anonymous and authenticated Supabase clients cannot directly read
+      or modify protected student, attendance, membership, and admin records
+- [ ] Decide whether staging needs structure only or a sanitized copy of current
+      data
+- [ ] If data is required, copy only the approved student roster and membership
+      balances; exclude passwords, tokens, test events, test attendance, and
+      unnecessary personal data
+- [ ] Configure a separate staging Storage bucket and verify image upload,
+      retrieval, file-size limits, and MIME-type validation
+- [ ] Run backend smoke tests against the new project without changing the
+      current production-target database
+- [ ] Verify table counts, API authentication, student activation, admin login,
+      event creation, attendance scanning, membership ledger, and image uploads
+- [ ] Document the final staging project reference and deployment environment
+      names without recording secret values
+- [ ] Add a repeatable migration workflow so future schema changes can be applied
+      to staging first and production afterward
 
 ### Phase 3 - Student Roster Management
 - [ ] Backend: `POST /api/v1/students/import/preview` - parse Excel, validate

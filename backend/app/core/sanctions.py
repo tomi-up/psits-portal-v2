@@ -65,10 +65,23 @@ def sync_sanctions_for_student(student_id: str, db: Session) -> None:
             continue
 
         attendance = attendance_by_event.get(event.id)
-        # PRESENT (finalized) or EXCUSED attendance means no absence. Anything
-        # else - no registration at all, or INCOMPLETE (finalizes to ABSENT
-        # once archived) - counts as a missed required event.
-        if attendance and attendance.status in ("PRESENT", "EXCUSED"):
+        # PRESENT (finalized), LATE, or EXCUSED attendance means no absence.
+        # Anything else - no registration at all, or INCOMPLETE (finalizes to
+        # ABSENT once archived) - counts as a missed required event.
+        #
+        # LATE (3-checkpoint events: missed the IN sweep but was scanned at
+        # MIDDLE and OUT) is attendance, not absence - the student was
+        # demonstrably there for most of the event, and sanctioning them the
+        # same as someone who never came would be plainly wrong.
+        #
+        # FOR_REVIEW is skipped rather than sanctioned: it means the scan
+        # pattern was ambiguous and an admin has not ruled on it yet. Creating
+        # a sanction now would penalise a student for the system's
+        # uncertainty. Once an admin resolves the record to PRESENT or
+        # INCOMPLETE, the next sync picks it up.
+        if attendance and attendance.status in ("PRESENT", "LATE", "EXCUSED"):
+            continue
+        if attendance and attendance.status == "FOR_REVIEW":
             continue
 
         db.add(Sanction(student_id=student_id, event_id=event.id, status="PENDING"))

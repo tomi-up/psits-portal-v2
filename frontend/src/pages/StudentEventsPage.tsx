@@ -12,6 +12,8 @@ import {
   UserPlus,
   FileWarning,
   HelpCircle,
+  ClipboardList,
+  CheckCircle2,
 } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
@@ -36,6 +38,8 @@ interface EventItem {
   is_checked_out: boolean
   excuse_status: 'PENDING' | 'APPROVED' | 'REJECTED' | null
   excuse_rejection_reason: string | null
+  survey_required: boolean
+  survey_status: 'PENDING' | 'SUBMITTED' | null
 }
 
 type SortKey = 'name' | 'event_date'
@@ -65,7 +69,7 @@ export default function StudentEventsPage() {
   const [sortAsc, setSortAsc] = useState(true)
 
   useEffect(() => {
-    const stored = localStorage.getItem('user')
+    const stored = sessionStorage.getItem('user')
     if (!stored) {
       navigate('/login', { replace: true })
       return
@@ -167,8 +171,8 @@ export default function StudentEventsPage() {
     })
     if (!confirmed) return
 
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user')
+    sessionStorage.removeItem('access_token')
+    sessionStorage.removeItem('user')
     navigate('/login', { replace: true })
   }
 
@@ -394,9 +398,16 @@ export default function StudentEventsPage() {
                                   <FileWarning className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                            {event.is_checked_out ? (
+                            {event.is_checked_out && event.survey_status === 'PENDING' ? (
+                              <span
+                                title="Attendance Pending - complete the survey from your Attendance page to confirm"
+                                className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
+                              >
+                                Attendance Pending
+                              </span>
+                            ) : event.is_checked_out ? (
                               <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                                ✓ Present
+                                Present
                               </span>
                             ) : event.excuse_status === 'APPROVED' ? (
                               <span className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400">
@@ -510,6 +521,34 @@ export default function StudentEventsPage() {
               </div>
             )}
 
+            {viewEvent.is_checked_out && viewEvent.survey_status === 'PENDING' && (
+              <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                  <p className="text-sm font-semibold text-sky-800 dark:text-sky-300">Attendance Pending</p>
+                </div>
+                <p className="mt-1.5 text-xs text-sky-700 dark:text-sky-400">
+                  Your attendance was recorded. Complete the post-event survey from your{' '}
+                  <span className="font-semibold">Attendance</span> page to confirm it.
+                </p>
+              </div>
+            )}
+
+            {viewEvent.is_checked_out && viewEvent.survey_status === 'SUBMITTED' && (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Attendance Confirmed</p>
+                </div>
+                <p className="mt-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                  Your post-event survey was submitted successfully.
+                </p>
+                <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  Attendance: PRESENT
+                </p>
+              </div>
+            )}
+
             <button
               onClick={() => setViewEvent(null)}
               className="mt-5 w-full rounded-lg border border-slate-200 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -582,6 +621,7 @@ export default function StudentEventsPage() {
           </div>
         </div>
       )}
+
     </div>
   )
 }

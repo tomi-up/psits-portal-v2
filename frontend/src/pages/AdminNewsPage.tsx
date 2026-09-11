@@ -96,7 +96,7 @@ export default function AdminNewsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar
         title="PSITS Admin"
         open={menuOpen}
@@ -105,21 +105,21 @@ export default function AdminNewsPage() {
       />
 
       <div className="lg:pl-64">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-4 lg:px-10">
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMenuOpen(true)} />
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">News &amp; Updates</h1>
-              <p className="text-sm text-slate-500">Facebook posts shown in the landing page's News section</p>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">News &amp; Updates</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Facebook posts shown in the landing page's News section</p>
             </div>
           </div>
           <AdminProfileMenu />
         </header>
 
         <main className="px-6 py-8 lg:px-10">
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-sm font-semibold text-slate-900">Add a Post</h2>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="mb-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Add a Post</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Paste the URL of a public post from the PSITS-USM Facebook page.
             </p>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row">
@@ -128,7 +128,7 @@ export default function AdminNewsPage() {
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
                 placeholder="https://www.facebook.com/PSITSUSM/posts/..."
-                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
               />
               <button
                 onClick={handleAdd}
@@ -141,15 +141,15 @@ export default function AdminNewsPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 p-4">
-              <h2 className="text-sm font-semibold text-slate-900">Current Posts</h2>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="border-b border-slate-100 dark:border-slate-800 p-4">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Current Posts</h2>
             </div>
 
             {loading ? (
               <div className="space-y-3 p-5">
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : posts.length === 0 ? (
               <EmptyState title="No posts added yet." />
@@ -161,7 +161,7 @@ export default function AdminNewsPage() {
                       href={post.facebook_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="truncate text-sm text-sky-700 hover:underline"
+                      className="truncate text-sm text-sky-700 dark:text-sky-400 hover:underline"
                     >
                       {post.facebook_url}
                     </a>
@@ -169,7 +169,7 @@ export default function AdminNewsPage() {
                       onClick={() => handleDelete(post)}
                       disabled={deletingId === post.id}
                       title="Remove"
-                      className="shrink-0 rounded-lg border border-slate-200 p-2 text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                      className="shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 p-2 text-rose-600 dark:text-rose-400 transition hover:bg-rose-50 disabled:opacity-50"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>

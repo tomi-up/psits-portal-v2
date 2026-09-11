@@ -51,13 +51,15 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <AuthLayout forceLight>
-      <h1 className="text-2xl font-semibold text-slate-900">Admin Sign In</h1>
-      <p className="mt-1 text-sm text-slate-500">Sign in with your officer/admin email and password.</p>
+    <AuthLayout>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Admin Sign In</h1>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        Sign in with your officer/admin email and password.
+      </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <div>
-          <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             Email
           </label>
           <input
@@ -68,12 +70,12 @@ export default function AdminLoginPage() {
             placeholder="usm.psits@admin.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             Password
           </label>
           <input
@@ -84,7 +86,7 @@ export default function AdminLoginPage() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
           />
         </div>
 

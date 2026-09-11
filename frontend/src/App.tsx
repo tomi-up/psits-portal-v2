@@ -27,8 +27,10 @@ import AdminExcuseRequestsPage from '@/pages/AdminExcuseRequestsPage'
 import AdminPaymentsPage from '@/pages/AdminPaymentsPage'
 import AdminNewsPage from '@/pages/AdminNewsPage'
 import AdminSanctionsPage from '@/pages/AdminSanctionsPage'
+import AdminInventoryPage from '@/pages/AdminInventoryPage'
 import AdminHelpPage from '@/pages/AdminHelpPage'
 import QRScannerPage from '@/pages/QRScannerPage'
+import CheckpointScannerPage from '@/pages/CheckpointScannerPage'
 import UnauthorizedPage from '@/pages/UnauthorizedPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
@@ -85,12 +87,19 @@ export default function App() {
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
           <Route path="/admin/news" element={<AdminNewsPage />} />
           <Route path="/admin/sanctions" element={<AdminSanctionsPage />} />
+          <Route path="/admin/inventory" element={<AdminInventoryPage />} />
           <Route path="/admin/help" element={<AdminHelpPage />} />
 
-          {/* Scanner - an admin must be logged in on this device to scan attendance */}
+          {/* Legacy two-scan scanner - an admin must be logged in on this device */}
           <Route path="/scanner/:eventId" element={<QRScannerPage />} />
           <Route path="/scanner" element={<QRScannerPage />} />
         </Route>
+
+        {/* 3-checkpoint scanner. Deliberately OUTSIDE RequireAdmin: officers
+            are not admins and sign in with an event code + their own PIN, and
+            handing every scanner operator an admin login would defeat the
+            per-officer audit trail the checkpoint workflow is built on. */}
+        <Route path="/checkpoint-scanner" element={<CheckpointScannerPage />} />
 
         <Route path="/404" element={<NotFoundPage />} />
         <Route path="*" element={<NotFoundPage />} />

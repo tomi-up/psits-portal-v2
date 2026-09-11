@@ -193,8 +193,8 @@ export default function AdminStudentFormPage() {
 
   function fieldClass(field: string) {
     return fieldErrors[field]
-      ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20'
-      : 'border-slate-200 bg-slate-50 focus:border-sky-500 focus:ring-sky-500/20'
+      ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20 dark:border-red-700 dark:bg-red-950/30'
+      : 'border-slate-200 bg-slate-50 focus:border-sky-500 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800'
   }
 
   function clearError(field: string) {
@@ -202,7 +202,7 @@ export default function AdminStudentFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar
         title="PSITS Admin"
         open={menuOpen}
@@ -211,12 +211,12 @@ export default function AdminStudentFormPage() {
       />
 
       <div className="lg:pl-64">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4 lg:px-10">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-4 lg:px-10">
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMenuOpen(true)} />
             <Link
               to="/admin/students"
-              className="flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700"
+              className="flex items-center gap-1 text-sm font-medium text-sky-600 dark:text-sky-400 transition hover:text-sky-700"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -226,25 +226,25 @@ export default function AdminStudentFormPage() {
         </header>
 
         <main className="px-6 py-8 lg:px-10">
-          <div className="w-full rounded-xl border border-slate-200 bg-white p-6">
-            <h2 className="mb-4 text-base font-semibold text-slate-900">
+          <div className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6">
+            <h2 className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {isEditing ? 'Edit Student' : 'Add Student'}
             </h2>
             {loading ? (
               <div className="space-y-3">
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Student ID <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Student ID <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <div className="relative">
-                      <IdCard className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <IdCard className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={form.student_id}
@@ -253,17 +253,17 @@ export default function AdminStudentFormPage() {
                           clearError('student_id')
                         }}
                         placeholder="22-42998"
-                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('student_id')}`}
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('student_id')}`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Last Name <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Last Name <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <div className="relative">
-                      <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={form.last_name}
@@ -272,17 +272,17 @@ export default function AdminStudentFormPage() {
                           clearError('last_name')
                         }}
                         placeholder="Dela Cruz"
-                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('last_name')}`}
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('last_name')}`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      First Name <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      First Name <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <div className="relative">
-                      <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={form.first_name}
@@ -291,7 +291,7 @@ export default function AdminStudentFormPage() {
                           clearError('first_name')
                         }}
                         placeholder="Juan"
-                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('first_name')}`}
+                        className={`w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('first_name')}`}
                       />
                     </div>
                   </div>
@@ -299,51 +299,51 @@ export default function AdminStudentFormPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Middle Name</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Middle Name</label>
                     <input
                       type="text"
                       value={form.middle_name}
                       onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
                       placeholder="Santos"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Suffix</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Suffix</label>
                     <input
                       type="text"
                       value={form.suffix}
                       onChange={(e) => setForm({ ...form, suffix: e.target.value })}
                       placeholder="Jr."
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
                     <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="email"
                         value={form.email}
                         onChange={(e) => setForm({ ...form, email: e.target.value })}
                         placeholder="student@example.com"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Contact Number</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Contact Number</label>
                     <div className="relative">
-                      <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                       <input
                         type="text"
                         value={form.contact_number}
                         onChange={(e) => setForm({ ...form, contact_number: e.target.value })}
                         placeholder="09XX XXX XXXX"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                       />
                     </div>
                   </div>
@@ -351,11 +351,11 @@ export default function AdminStudentFormPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Program</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Program</label>
                     <select
                       value={form.program}
                       onChange={(e) => setForm({ ...form, program: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     >
                       {PROGRAM_OPTIONS.map((p) => (
                         <option key={p} value={p}>
@@ -365,11 +365,11 @@ export default function AdminStudentFormPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Year Level</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Year Level</label>
                     <select
                       value={form.year_level}
                       onChange={(e) => setForm({ ...form, year_level: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     >
                       <option value={1}>Year 1</option>
                       <option value={2}>Year 2</option>
@@ -378,8 +378,8 @@ export default function AdminStudentFormPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Section <span className="text-red-500">*</span>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Section <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <input
                       type="text"
@@ -389,18 +389,18 @@ export default function AdminStudentFormPage() {
                         clearError('section')
                       }}
                       placeholder="A"
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm text-slate-900 transition focus:bg-white focus:outline-none focus:ring-2 ${fieldClass('section')}`}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 ${fieldClass('section')}`}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Academic Standing</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Academic Standing</label>
                     <select
                       value={form.academic_standing}
                       onChange={(e) => setForm({ ...form, academic_standing: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     >
                       <option value="REGULAR">Regular</option>
                       <option value="IRREGULAR">Irregular</option>
@@ -408,11 +408,11 @@ export default function AdminStudentFormPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Enrollment Status</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Enrollment Status</label>
                     <select
                       value={form.enrollment_status}
                       onChange={(e) => setForm({ ...form, enrollment_status: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                     >
                       <option value="ACTIVE">Active</option>
                       <option value="INACTIVE">Inactive</option>
@@ -421,10 +421,10 @@ export default function AdminStudentFormPage() {
                 </div>
 
                 {/* Account activated toggle */}
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Portal Account Activated</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Portal Account Activated</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       Whether this student has completed authenticator (TOTP) setup and can log in. New
                       students always start unactivated - they activate it themselves.
                     </p>
@@ -439,7 +439,7 @@ export default function AdminStudentFormPage() {
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-slate-900 shadow transition ${
                         form.is_active ? 'left-5' : 'left-0.5'
                       }`}
                     />
@@ -447,17 +447,17 @@ export default function AdminStudentFormPage() {
                 </div>
 
                 {isEditing && form.is_active && (
-                  <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex items-center justify-between rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-amber-900">Lost device?</p>
-                      <p className="text-xs text-amber-700">
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-300">Lost device?</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
                         Reset their authenticator so they can scan a new QR code and activate again.
                       </p>
                     </div>
                     <button
                       onClick={handleResetAuthenticator}
                       disabled={resetting}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm font-semibold text-amber-700 dark:text-amber-400 transition hover:bg-amber-100 disabled:opacity-50"
                     >
                       <RotateCcw className="h-4 w-4" />
                       {resetting ? 'Resetting...' : 'Reset Authenticator'}
@@ -468,7 +468,7 @@ export default function AdminStudentFormPage() {
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={handleCancel}
-                    className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                    className="rounded-xl border border-slate-200 dark:border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     Cancel
                   </button>

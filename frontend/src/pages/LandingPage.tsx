@@ -37,11 +37,23 @@ export default function LandingPage() {
       .then((res) => (res.ok ? res.json() : { events: [] }))
       .then((data) => {
         const now = Date.now()
-        const upcoming = (data.events as EventItem[])
-          .filter((e) => !e.event_date || new Date(e.event_date).getTime() >= now)
-          .sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''))
+        const eventTime = (event: EventItem) => {
+          if (!event.event_date) return Number.POSITIVE_INFINITY
+          const parsed = new Date(event.event_date).getTime()
+          return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed
+        }
+        const activeEvents = [...(data.events as EventItem[])]
+          .sort((a, b) => {
+            const aTime = eventTime(a)
+            const bTime = eventTime(b)
+            const aUpcoming = aTime >= now
+            const bUpcoming = bTime >= now
+
+            if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1
+            return aUpcoming ? aTime - bTime : bTime - aTime
+          })
           .slice(0, 6)
-        setEvents(upcoming)
+        setEvents(activeEvents)
       })
       .catch(() => setEvents([]))
 
@@ -203,7 +215,7 @@ export default function LandingPage() {
                   <li>Uphold the rules and standards of USM, OSA, and CEIT.</li>
                   <li>Collaborate with USG and other recognized student organizations.</li>
                   <li>Promote academic excellence, research culture, and ethical IT practices.</li>
-                  <li>Foster leadership, camaraderie, and civic engagement among BSCS, BSIS, and BLIS students.</li>
+                  <li>Foster leadership, camaraderie, and civic engagement among BSIT, BSCS, BSIS, and BLIS students.</li>
                   <li>Provide a platform for dialogue and joint action on IT education and community development.</li>
                 </ul>
               </article>
@@ -211,12 +223,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Upcoming Events */}
+        {/* Active Events */}
         <section id="events" className="scroll-mt-20 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-400">What&apos;s Happening</p>
-            <h2 className="mt-3 text-3xl font-bold text-white">Upcoming Events</h2>
-            <p className="mt-2 text-slate-400">Seminars, assemblies, and activities coming up for PSITS-USM members.</p>
+            <h2 className="mt-3 text-3xl font-bold text-white">Active Events</h2>
+            <p className="mt-2 text-slate-400">Current seminars, assemblies, and activities for PSITS-USM members.</p>
           </div>
 
           <div className="mt-10">
@@ -228,7 +240,7 @@ export default function LandingPage() {
               </div>
             ) : events.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/15 bg-slate-900/40 p-8 text-center text-sm text-slate-400">
-                No upcoming events right now — check back soon.
+                No active events right now — check back soon.
               </div>
             ) : (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

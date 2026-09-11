@@ -3,15 +3,16 @@ import Swal from 'sweetalert2'
 const BASE = {
   buttonsStyling: false,
   customClass: {
-    popup: 'rounded-2xl font-sans',
-    title: '!text-lg !font-semibold !text-slate-900',
-    htmlContainer: '!text-sm !text-slate-500',
+    popup: 'rounded-2xl font-sans bg-white dark:bg-slate-900',
+    title: '!text-lg !font-semibold !text-slate-900 dark:!text-white',
+    htmlContainer: '!text-sm !text-slate-500 dark:!text-slate-400',
     confirmButton:
       'rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition mx-1',
     cancelButton:
-      'rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition mx-1',
+      'rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition mx-1 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
     denyButton:
       'rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 transition mx-1',
+    input: 'dark:!bg-slate-800 dark:!text-white dark:!border-slate-700',
   },
 }
 

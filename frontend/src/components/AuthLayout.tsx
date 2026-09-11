@@ -26,10 +26,10 @@ export default function AuthLayout({
 }: {
   children: ReactNode
   tagline?: string
-  /** Admin/legacy pages are intentionally out of dark-mode scope - their own
-   * text colors assume a white background, so this keeps the panel light
-   * regardless of the student side's (default-dark) theme setting instead
-   * of inheriting the ambient `dark` class and going low-contrast. */
+  /** Keeps this one panel light regardless of the ambient theme, for pages
+   * whose own content isn't dark-mode aware (e.g. ActivationPage). Admin
+   * login itself is not forced light - it follows the same theme as the
+   * rest of the admin panel. */
   forceLight?: boolean
 }) {
   const lightDots = {
