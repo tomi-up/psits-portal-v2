@@ -2,6 +2,7 @@
 payment QR code setting shown to every student on their Balance page."""
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -10,8 +11,11 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.deps import get_current_admin
 from app.models.admin import AdminAccount
-from app.models.student import Student
+from app.models.student import Student, SchoolYear
 from app.models.balance import MembershipFee, Payment, OrgSettings
+
+VALID_SEMESTERS = {"1ST", "2ND"}
+DEFAULT_FEE_AMOUNT = Decimal("100.00")
 
 router = APIRouter(prefix="/officer", tags=["admin-payments"], dependencies=[Depends(get_current_admin)])
 
@@ -61,6 +65,19 @@ class BalanceRow(BaseModel):
 class RecordPaymentBody(BaseModel):
     amount: float
     note: str | None = None
+
+
+class CreateBalanceBody(BaseModel):
+    student_id: str  # Student.student_id (business ID), not the internal row id
+    school_year_id: str
+    semester: str
+    amount_due: float = 100.0
+
+
+class SchoolYearOption(BaseModel):
+    id: str
+    label: str
+    is_active: bool
 
 
 @router.get("/payments/")
@@ -195,6 +212,75 @@ def list_balances(db: Session = Depends(get_db)):
             for f in fees
         ]
     }
+
+
+@router.get("/school-years")
+def list_school_years(db: Session = Depends(get_db)):
+    """For the term dropdown when adding a new balance."""
+    years = db.query(SchoolYear).order_by(SchoolYear.start_date.desc()).all()
+    return {
+        "school_years": [
+            SchoolYearOption(id=y.id, label=y.label, is_active=y.is_active) for y in years
+        ]
+    }
+
+
+@router.post("/balances/")
+def create_balance(
+    body: CreateBalanceBody, db: Session = Depends(get_db), admin: AdminAccount = Depends(get_current_admin)
+):
+    """Assess a new membership due for a student - e.g. a late enrollee who
+    doesn't have a fee row for this term yet, or a manually added charge."""
+
+    semester = body.semester.strip().upper()
+    if semester not in VALID_SEMESTERS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Semester must be one of {sorted(VALID_SEMESTERS)}",
+        )
+    if body.amount_due < 0:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Amount due cannot be negative")
+
+    student = db.query(Student).filter(Student.student_id == body.student_id).first()
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+    school_year = db.query(SchoolYear).filter(SchoolYear.id == body.school_year_id).first()
+    if not school_year:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="School year not found")
+
+    existing = db.query(MembershipFee).filter(
+        MembershipFee.student_id == student.id,
+        MembershipFee.school_year_id == school_year.id,
+        MembershipFee.semester == semester,
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{student.first_name} {student.last_name} already has a balance for {semester} {school_year.label}",
+        )
+
+    fee = MembershipFee(
+        student_id=student.id,
+        school_year_id=school_year.id,
+        semester=semester,
+        amount_due=Decimal(str(body.amount_due)),
+        amount_paid=Decimal("0.00"),
+    )
+    db.add(fee)
+    db.commit()
+
+    return BalanceRow(
+        fee_id=fee.id,
+        student_id=student.student_id,
+        student_name=f"{student.first_name} {student.last_name}",
+        school_year=school_year.label,
+        semester=semester,
+        amount_due=float(fee.amount_due),
+        amount_paid=0.0,
+        balance=float(fee.amount_due),
+        status=_fee_status(float(fee.amount_due), 0.0),
+    )
 
 
 @router.post("/balances/{fee_id}/record-payment")

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, X, QrCode } from 'lucide-react'
+import { Check, X, QrCode, Search, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction, confirmActionWithReason } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
@@ -35,6 +35,18 @@ interface BalanceRow {
   amount_paid: number
   balance: number
   status: 'PAID' | 'PARTIAL' | 'UNPAID'
+}
+
+interface StudentOption {
+  student_id: string
+  first_name: string
+  last_name: string
+}
+
+interface SchoolYearOption {
+  id: string
+  label: string
+  is_active: boolean
 }
 
 type StatusFilter = 'PENDING' | 'ALL'
@@ -76,10 +88,34 @@ export default function AdminPaymentsPage() {
   const [recordNote, setRecordNote] = useState('')
   const [recording, setRecording] = useState(false)
 
+  const [addBalanceOpen, setAddBalanceOpen] = useState(false)
+  const [studentOptions, setStudentOptions] = useState<StudentOption[]>([])
+  const [schoolYearOptions, setSchoolYearOptions] = useState<SchoolYearOption[]>([])
+  const [newBalanceStudentId, setNewBalanceStudentId] = useState('')
+  const [newBalanceSchoolYearId, setNewBalanceSchoolYearId] = useState('')
+  const [newBalanceSemester, setNewBalanceSemester] = useState('1ST')
+  const [newBalanceAmount, setNewBalanceAmount] = useState('100')
+  const [addingBalance, setAddingBalance] = useState(false)
+
+  // Submissions table: search, term filter, pagination
+  const [paymentSearch, setPaymentSearch] = useState('')
+  const [paymentTermFilter, setPaymentTermFilter] = useState('ALL')
+  const [paymentPageSize, setPaymentPageSize] = useState(25)
+  const [paymentPage, setPaymentPage] = useState(1)
+
+  // Student Balances table: search, filters, pagination
+  const [balanceSearch, setBalanceSearch] = useState('')
+  const [balanceStatusFilter, setBalanceStatusFilter] = useState('ALL')
+  const [balanceTermFilter, setBalanceTermFilter] = useState('ALL')
+  const [balancePageSize, setBalancePageSize] = useState(25)
+  const [balancePage, setBalancePage] = useState(1)
+
   useEffect(() => {
     void loadPayments()
     void loadQrSetting()
     void loadBalances()
+    void loadStudentOptions()
+    void loadSchoolYearOptions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
@@ -123,6 +159,70 @@ export default function AdminPaymentsPage() {
       await Promise.all([loadPayments(true), loadBalances(true), loadQrSetting()])
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  async function loadStudentOptions() {
+    try {
+      const res = await adminFetch(`${API}/officer/students/`)
+      if (res.ok) setStudentOptions((await res.json()).students)
+    } catch {
+      // Non-critical - the Add Balance student dropdown just starts empty.
+    }
+  }
+
+  async function loadSchoolYearOptions() {
+    try {
+      const res = await adminFetch(`${API}/officer/school-years`)
+      if (res.ok) setSchoolYearOptions((await res.json()).school_years)
+    } catch {
+      // Non-critical - the Add Balance term dropdown just starts empty.
+    }
+  }
+
+  function openAddBalance() {
+    setNewBalanceStudentId('')
+    setNewBalanceSchoolYearId(schoolYearOptions.find((y) => y.is_active)?.id ?? schoolYearOptions[0]?.id ?? '')
+    setNewBalanceSemester('1ST')
+    setNewBalanceAmount('100')
+    setAddBalanceOpen(true)
+  }
+
+  async function handleCreateBalance() {
+    if (!newBalanceStudentId || !newBalanceSchoolYearId) {
+      notify.error('Missing info', 'Please pick a student and a term.')
+      return
+    }
+    const amountNum = Number(newBalanceAmount)
+    if (!amountNum || amountNum <= 0) {
+      notify.error('Invalid amount', 'Please enter how much is due.')
+      return
+    }
+
+    setAddingBalance(true)
+    try {
+      const res = await adminFetch(`${API}/officer/balances/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: newBalanceStudentId,
+          school_year_id: newBalanceSchoolYearId,
+          semester: newBalanceSemester,
+          amount_due: amountNum,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        notify.error('Could not add balance', err.detail || 'Please try again.')
+        return
+      }
+      notify.success('Balance added', 'The new due has been added to the ledger.')
+      setAddBalanceOpen(false)
+      await loadBalances()
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setAddingBalance(false)
     }
   }
 
@@ -242,6 +342,68 @@ export default function AdminPaymentsPage() {
     [payments]
   )
 
+  const paymentTerms = useMemo(
+    () => Array.from(new Set(payments.map((p) => `${p.semester}|${p.school_year}`))).sort(),
+    [payments]
+  )
+
+  const filteredPayments = useMemo(() => {
+    const q = paymentSearch.trim().toLowerCase()
+    let list = sorted
+    if (q) {
+      list = list.filter(
+        (p) =>
+          p.student_id.toLowerCase().includes(q) ||
+          p.student_name.toLowerCase().includes(q) ||
+          p.reference_number.toLowerCase().includes(q)
+      )
+    }
+    if (paymentTermFilter !== 'ALL') {
+      list = list.filter((p) => `${p.semester}|${p.school_year}` === paymentTermFilter)
+    }
+    return list
+  }, [sorted, paymentSearch, paymentTermFilter])
+
+  const paymentTotalPages = Math.max(1, Math.ceil(filteredPayments.length / paymentPageSize))
+  const pagedPayments = filteredPayments.slice(
+    (paymentPage - 1) * paymentPageSize,
+    paymentPage * paymentPageSize
+  )
+
+  useEffect(() => {
+    setPaymentPage(1)
+  }, [paymentSearch, paymentTermFilter, paymentPageSize, statusFilter])
+
+  const balanceTerms = useMemo(
+    () => Array.from(new Set(balances.map((b) => `${b.semester}|${b.school_year}`))).sort(),
+    [balances]
+  )
+
+  const filteredBalances = useMemo(() => {
+    const q = balanceSearch.trim().toLowerCase()
+    let list = balances
+    if (q) {
+      list = list.filter(
+        (b) => b.student_id.toLowerCase().includes(q) || b.student_name.toLowerCase().includes(q)
+      )
+    }
+    if (balanceStatusFilter !== 'ALL') list = list.filter((b) => b.status === balanceStatusFilter)
+    if (balanceTermFilter !== 'ALL') {
+      list = list.filter((b) => `${b.semester}|${b.school_year}` === balanceTermFilter)
+    }
+    return list
+  }, [balances, balanceSearch, balanceStatusFilter, balanceTermFilter])
+
+  const balanceTotalPages = Math.max(1, Math.ceil(filteredBalances.length / balancePageSize))
+  const pagedBalances = filteredBalances.slice(
+    (balancePage - 1) * balancePageSize,
+    balancePage * balancePageSize
+  )
+
+  useEffect(() => {
+    setBalancePage(1)
+  }, [balanceSearch, balanceStatusFilter, balanceTermFilter, balancePageSize])
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
       <Sidebar
@@ -321,28 +483,75 @@ export default function AdminPaymentsPage() {
 
           {tab === 'submissions' && (
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setStatusFilter('PENDING')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    statusFilter === 'PENDING'
-                      ? 'bg-sky-600 text-white'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => setStatusFilter('ALL')}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    statusFilter === 'ALL'
-                      ? 'bg-sky-600 text-white'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  All
-                </button>
+            <div className="space-y-3 border-b border-slate-100 dark:border-slate-800 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <span>Show</span>
+                  <select
+                    value={paymentPageSize}
+                    onChange={(e) => setPaymentPageSize(Number(e.target.value))}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span>entries</span>
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                  <input
+                    type="text"
+                    value={paymentSearch}
+                    onChange={(e) => setPaymentSearch(e.target.value)}
+                    placeholder="Search name, Student ID, or reference #..."
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-2 pl-9 pr-3 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStatusFilter('PENDING')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      statusFilter === 'PENDING'
+                        ? 'bg-sky-600 text-white'
+                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('ALL')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      statusFilter === 'ALL'
+                        ? 'bg-sky-600 text-white'
+                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    All
+                  </button>
+                </div>
+                {paymentTerms.length > 1 && (
+                  <select
+                    value={paymentTermFilter}
+                    onChange={(e) => setPaymentTermFilter(e.target.value)}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="ALL">All Terms</option>
+                    {paymentTerms.map((t) => {
+                      const [sem, year] = t.split('|')
+                      return (
+                        <option key={t} value={t}>
+                          {semesterLabel(sem)} {year}
+                        </option>
+                      )
+                    })}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -352,9 +561,15 @@ export default function AdminPaymentsPage() {
                 <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
                 <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
-            ) : sorted.length === 0 ? (
+            ) : filteredPayments.length === 0 ? (
               <EmptyState
-                title={statusFilter === 'PENDING' ? 'No pending payments.' : 'No payments have been submitted.'}
+                title={
+                  sorted.length === 0
+                    ? statusFilter === 'PENDING'
+                      ? 'No pending payments.'
+                      : 'No payments have been submitted.'
+                    : 'No payments match these filters.'
+                }
               />
             ) : (
               <div className="overflow-x-auto">
@@ -371,7 +586,7 @@ export default function AdminPaymentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sorted.map((p) => (
+                    {pagedPayments.map((p) => (
                       <tr key={p.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="px-5 py-3">
                           <p className="font-medium text-slate-900 dark:text-white">{p.student_name}</p>
@@ -437,13 +652,109 @@ export default function AdminPaymentsPage() {
                 </table>
               </div>
             )}
+
+            {!loading && filteredPayments.length > 0 && (
+              <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-slate-500 dark:text-slate-400">
+                <span>
+                  Showing {(paymentPage - 1) * paymentPageSize + 1}–
+                  {Math.min(paymentPage * paymentPageSize, filteredPayments.length)} of{' '}
+                  {filteredPayments.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPaymentPage((p) => Math.max(1, p - 1))}
+                    disabled={paymentPage === 1}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white">
+                    {paymentPage}
+                  </span>
+                  <button
+                    onClick={() => setPaymentPage((p) => Math.min(paymentTotalPages, p + 1))}
+                    disabled={paymentPage === paymentTotalPages}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           )}
 
           {tab === 'balances' && (
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <div className="border-b border-slate-100 p-4 dark:border-slate-800">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Record a payment directly - e.g. cash paid in person.</p>
+            <div className="space-y-3 border-b border-slate-100 dark:border-slate-800 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Record a payment directly - e.g. cash paid in person.</p>
+                <button
+                  onClick={openAddBalance}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Balance
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <span>Show</span>
+                  <select
+                    value={balancePageSize}
+                    onChange={(e) => setBalancePageSize(Number(e.target.value))}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span>entries</span>
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                  <input
+                    type="text"
+                    value={balanceSearch}
+                    onChange={(e) => setBalanceSearch(e.target.value)}
+                    placeholder="Search name or Student ID..."
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-2 pl-9 pr-3 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={balanceStatusFilter}
+                  onChange={(e) => setBalanceStatusFilter(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="PAID">Paid</option>
+                  <option value="PARTIAL">Partial</option>
+                  <option value="UNPAID">Unpaid</option>
+                </select>
+                {balanceTerms.length > 1 && (
+                  <select
+                    value={balanceTermFilter}
+                    onChange={(e) => setBalanceTermFilter(e.target.value)}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="ALL">All Terms</option>
+                    {balanceTerms.map((t) => {
+                      const [sem, year] = t.split('|')
+                      return (
+                        <option key={t} value={t}>
+                          {semesterLabel(sem)} {year}
+                        </option>
+                      )
+                    })}
+                  </select>
+                )}
+              </div>
             </div>
 
             {balancesLoading ? (
@@ -452,8 +763,10 @@ export default function AdminPaymentsPage() {
                 <div className="h-4 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
                 <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
               </div>
-            ) : balances.length === 0 ? (
-              <EmptyState title="No membership dues on record yet." />
+            ) : filteredBalances.length === 0 ? (
+              <EmptyState
+                title={balances.length === 0 ? 'No membership dues on record yet.' : 'No balances match these filters.'}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -469,7 +782,7 @@ export default function AdminPaymentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {balances.map((row) => (
+                    {pagedBalances.map((row) => (
                       <tr key={row.fee_id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
                         <td className="px-5 py-3">
                           <p className="font-medium text-slate-900 dark:text-white">{row.student_name}</p>
@@ -512,6 +825,35 @@ export default function AdminPaymentsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {!balancesLoading && filteredBalances.length > 0 && (
+              <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-5 py-3 text-sm text-slate-500 dark:text-slate-400">
+                <span>
+                  Showing {(balancePage - 1) * balancePageSize + 1}–
+                  {Math.min(balancePage * balancePageSize, filteredBalances.length)} of{' '}
+                  {filteredBalances.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setBalancePage((p) => Math.max(1, p - 1))}
+                    disabled={balancePage === 1}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white">
+                    {balancePage}
+                  </span>
+                  <button
+                    onClick={() => setBalancePage((p) => Math.min(balanceTotalPages, p + 1))}
+                    disabled={balancePage === balanceTotalPages}
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -567,6 +909,95 @@ export default function AdminPaymentsPage() {
 
             <button
               onClick={() => setRecordFor(null)}
+              className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {addBalanceOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setAddBalanceOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Add Balance</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Assess a new membership due for a student, e.g. a late enrollee with no fee on record yet.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Student</label>
+                <select
+                  value={newBalanceStudentId}
+                  onChange={(e) => setNewBalanceStudentId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value="">Select a student...</option>
+                  {studentOptions.map((s) => (
+                    <option key={s.student_id} value={s.student_id}>
+                      {s.last_name}, {s.first_name} ({s.student_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">School Year</label>
+                  <select
+                    value={newBalanceSchoolYearId}
+                    onChange={(e) => setNewBalanceSchoolYearId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  >
+                    <option value="">Select...</option>
+                    {schoolYearOptions.map((y) => (
+                      <option key={y.id} value={y.id}>
+                        {y.label}
+                        {y.is_active ? ' (active)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Semester</label>
+                  <select
+                    value={newBalanceSemester}
+                    onChange={(e) => setNewBalanceSemester(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  >
+                    <option value="1ST">1st Sem</option>
+                    <option value="2ND">2nd Sem</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Amount Due</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newBalanceAmount}
+                  onChange={(e) => setNewBalanceAmount(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+              </div>
+              <button
+                onClick={handleCreateBalance}
+                disabled={addingBalance}
+                className="w-full rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+              >
+                {addingBalance ? 'Adding...' : 'Add Balance'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setAddBalanceOpen(false)}
               className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Cancel
