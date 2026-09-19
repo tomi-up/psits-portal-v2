@@ -106,7 +106,8 @@ export default function AdminPaymentsPage() {
   // Student Balances table: search, filters, pagination
   const [balanceSearch, setBalanceSearch] = useState('')
   const [balanceStatusFilter, setBalanceStatusFilter] = useState('ALL')
-  const [balanceTermFilter, setBalanceTermFilter] = useState('ALL')
+  const [balanceYearFilter, setBalanceYearFilter] = useState('ALL')
+  const [balanceSemFilter, setBalanceSemFilter] = useState('ALL')
   const [balancePageSize, setBalancePageSize] = useState(25)
   const [balancePage, setBalancePage] = useState(1)
 
@@ -374,25 +375,48 @@ export default function AdminPaymentsPage() {
     setPaymentPage(1)
   }, [paymentSearch, paymentTermFilter, paymentPageSize, statusFilter])
 
-  const balanceTerms = useMemo(
-    () => Array.from(new Set(balances.map((b) => `${b.semester}|${b.school_year}`))).sort(),
+  const balanceYears = useMemo(
+    () => Array.from(new Set(balances.map((b) => b.school_year))).sort().reverse(),
     [balances]
   )
 
+  // The summary cards follow the selected school year / semester only, so
+  // they stay a true term total while the table is narrowed by search/status.
+  const termBalances = useMemo(
+    () =>
+      balances.filter(
+        (b) =>
+          (balanceYearFilter === 'ALL' || b.school_year === balanceYearFilter) &&
+          (balanceSemFilter === 'ALL' || b.semester === balanceSemFilter)
+      ),
+    [balances, balanceYearFilter, balanceSemFilter]
+  )
+
+  const balanceTotals = useMemo(() => {
+    const collectibles = termBalances.reduce((sum, b) => sum + b.amount_due, 0)
+    const collected = termBalances.reduce((sum, b) => sum + Math.min(b.amount_paid, b.amount_due), 0)
+    const paidCount = termBalances.filter((b) => b.status === 'PAID').length
+    return {
+      collectibles,
+      collected,
+      notCollected: collectibles - collected,
+      paidCount,
+      total: termBalances.length,
+      rate: collectibles > 0 ? Math.round((collected / collectibles) * 100) : 0,
+    }
+  }, [termBalances])
+
   const filteredBalances = useMemo(() => {
     const q = balanceSearch.trim().toLowerCase()
-    let list = balances
+    let list = termBalances
     if (q) {
       list = list.filter(
         (b) => b.student_id.toLowerCase().includes(q) || b.student_name.toLowerCase().includes(q)
       )
     }
     if (balanceStatusFilter !== 'ALL') list = list.filter((b) => b.status === balanceStatusFilter)
-    if (balanceTermFilter !== 'ALL') {
-      list = list.filter((b) => `${b.semester}|${b.school_year}` === balanceTermFilter)
-    }
     return list
-  }, [balances, balanceSearch, balanceStatusFilter, balanceTermFilter])
+  }, [termBalances, balanceSearch, balanceStatusFilter])
 
   const balanceTotalPages = Math.max(1, Math.ceil(filteredBalances.length / balancePageSize))
   const pagedBalances = filteredBalances.slice(
@@ -402,7 +426,7 @@ export default function AdminPaymentsPage() {
 
   useEffect(() => {
     setBalancePage(1)
-  }, [balanceSearch, balanceStatusFilter, balanceTermFilter, balancePageSize])
+  }, [balanceSearch, balanceStatusFilter, balanceYearFilter, balanceSemFilter, balancePageSize])
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
@@ -685,6 +709,44 @@ export default function AdminPaymentsPage() {
           )}
 
           {tab === 'balances' && (
+          <>
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Total Collectibles
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {balancesLoading ? '—' : peso(balanceTotals.collectibles)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                {balanceTotals.total} fee{balanceTotals.total === 1 ? '' : 's'} ·{' '}
+                {balanceYearFilter === 'ALL' ? 'All school years' : balanceYearFilter} ·{' '}
+                {balanceSemFilter === 'ALL' ? 'Both semesters' : semesterLabel(balanceSemFilter)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Collected</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
+                {balancesLoading ? '—' : peso(balanceTotals.collected)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                {balanceTotals.rate}% collected · {balanceTotals.paidCount} fully paid
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Not Yet Collected
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-rose-600 dark:text-rose-400">
+                {balancesLoading ? '—' : peso(balanceTotals.notCollected)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                {balanceTotals.total - balanceTotals.paidCount} unsettled fee
+                {balanceTotals.total - balanceTotals.paidCount === 1 ? '' : 's'}
+              </p>
+            </div>
+          </div>
+
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
             <div className="space-y-3 border-b border-slate-100 dark:border-slate-800 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -737,23 +799,27 @@ export default function AdminPaymentsPage() {
                   <option value="PARTIAL">Partial</option>
                   <option value="UNPAID">Unpaid</option>
                 </select>
-                {balanceTerms.length > 1 && (
-                  <select
-                    value={balanceTermFilter}
-                    onChange={(e) => setBalanceTermFilter(e.target.value)}
-                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
-                  >
-                    <option value="ALL">All Terms</option>
-                    {balanceTerms.map((t) => {
-                      const [sem, year] = t.split('|')
-                      return (
-                        <option key={t} value={t}>
-                          {semesterLabel(sem)} {year}
-                        </option>
-                      )
-                    })}
-                  </select>
-                )}
+                <select
+                  value={balanceYearFilter}
+                  onChange={(e) => setBalanceYearFilter(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="ALL">All School Years</option>
+                  {balanceYears.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={balanceSemFilter}
+                  onChange={(e) => setBalanceSemFilter(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="ALL">Both Semesters</option>
+                  <option value="1ST">1st Sem</option>
+                  <option value="2ND">2nd Sem</option>
+                </select>
               </div>
             </div>
 
@@ -857,6 +923,7 @@ export default function AdminPaymentsPage() {
               </div>
             )}
           </div>
+          </>
           )}
         </main>
       </div>
