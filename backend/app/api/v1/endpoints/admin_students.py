@@ -5,6 +5,8 @@ router requires a valid Authorization: Bearer token from
 POST /api/v1/admin/auth/login.
 """
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -13,8 +15,12 @@ from app.core.database import get_db
 from app.core.deps import get_current_admin
 from app.models.student import Student, StudentSchoolYear, SchoolYear, Program
 from app.models.user import Profile, AccountStatus
+from app.models.balance import MembershipFee
 
 router = APIRouter(prefix="/officer/students", tags=["admin-students"], dependencies=[Depends(get_current_admin)])
+
+FEE_AMOUNT = Decimal("100.00")
+SEMESTERS = ("1ST", "2ND")
 
 
 class StudentRow(BaseModel):
@@ -139,6 +145,13 @@ def create_student(request: StudentUpsertRequest, db: Session = Depends(get_db))
         academic_standing=request.academic_standing,
     )
     db.add(ssy)
+
+    for semester in SEMESTERS:
+        db.add(MembershipFee(
+            student_id=student.id, school_year_id=school_year.id, semester=semester,
+            amount_due=FEE_AMOUNT, amount_paid=Decimal("0.00"),
+        ))
+
     db.commit()
     db.refresh(student)
     db.refresh(ssy)

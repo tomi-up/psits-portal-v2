@@ -188,14 +188,6 @@ export default function AdminPaymentsPage() {
     }
   }
 
-  function openAddBalance() {
-    setNewBalanceStudentId('')
-    setNewBalanceSchoolYearId(schoolYearOptions.find((y) => y.is_active)?.id ?? schoolYearOptions[0]?.id ?? '')
-    setNewBalanceSemester('1ST')
-    setNewBalanceAmount('100')
-    setAddBalanceOpen(true)
-  }
-
   function openAddBalanceForStudent(row: BalanceRow) {
     setNewBalanceStudentId(row.student_id)
     setNewBalanceSchoolYearId(schoolYearOptions.find((y) => y.is_active)?.id ?? schoolYearOptions[0]?.id ?? '')
@@ -814,22 +806,13 @@ export default function AdminPaymentsPage() {
             <div className="space-y-3 border-b border-slate-100 dark:border-slate-800 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-slate-500 dark:text-slate-400">Record a payment directly - e.g. cash paid in person.</p>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    onClick={openAddSchoolYear}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <Plus className="h-4 w-4" />
-                    School Year
-                  </button>
-                  <button
-                    onClick={openAddBalance}
-                    className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Balance
-                  </button>
-                </div>
+                <button
+                  onClick={openAddSchoolYear}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <Plus className="h-4 w-4" />
+                  School Year
+                </button>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
