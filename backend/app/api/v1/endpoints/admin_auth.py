@@ -3,6 +3,7 @@ plus optional TOTP 2FA layered on top of it."""
 
 import base64
 import io
+import re
 
 import pyotp
 import qrcode
@@ -21,6 +22,10 @@ from app.models.admin import AdminAccount
 router = APIRouter(prefix="/admin/auth", tags=["admin-auth"])
 
 MFA_PENDING_TOKEN_MINUTES = 10
+
+# At least one lowercase, one uppercase, one digit, and one symbol -
+# mirrors the live checklist shown on the Settings page's password form.
+PASSWORD_STRENGTH_RE = re.compile(r"(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s])")
 
 
 class AdminLoginRequest(BaseModel):
@@ -231,9 +236,13 @@ def admin_change_password(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="New password cannot exceed 72 characters",
         )
-    if len(body.new_password) < 8:
+    # Mirrors the strength checklist shown on the Settings page - enforced
+    # here too since client-side validation alone can always be bypassed.
+    if len(body.new_password) < 8 or not PASSWORD_STRENGTH_RE.search(body.new_password):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="New password must be at least 8 characters",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be at least 8 characters and include an uppercase letter, "
+                   "a lowercase letter, a number, and a symbol.",
         )
 
     admin.password_hash = hash_password(body.new_password)

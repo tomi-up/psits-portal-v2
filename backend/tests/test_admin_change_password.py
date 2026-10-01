@@ -9,19 +9,19 @@ class TestChangePassword:
         res = client.post(
             "/api/v1/admin/auth/change-password",
             headers=admin_headers,
-            json={"current_password": "adminpass123", "new_password": "newpassword456"},
+            json={"current_password": "adminpass123", "new_password": "NewPassword456!"},
         )
         assert res.status_code == 200, res.text
         assert res.json()["status"] == "CHANGED"
 
         admin = db.query(AdminAccount).filter(AdminAccount.email == "admin@psits-test.org").one()
-        assert verify_password("newpassword456", admin.password_hash)
+        assert verify_password("NewPassword456!", admin.password_hash)
         assert not verify_password("adminpass123", admin.password_hash)
 
         # The new password works for a fresh login.
         login = client.post(
             "/api/v1/admin/auth/login",
-            json={"email": "admin@psits-test.org", "password": "newpassword456"},
+            json={"email": "admin@psits-test.org", "password": "NewPassword456!"},
         )
         assert login.status_code == 200, login.text
 
@@ -29,7 +29,7 @@ class TestChangePassword:
         res = client.post(
             "/api/v1/admin/auth/change-password",
             headers=admin_headers,
-            json={"current_password": "wrong-password", "new_password": "newpassword456"},
+            json={"current_password": "wrong-password", "new_password": "NewPassword456!"},
         )
         assert res.status_code == 401
 
@@ -37,7 +37,7 @@ class TestChangePassword:
         res = client.post(
             "/api/v1/admin/auth/change-password",
             headers=admin_headers,
-            json={"current_password": "adminpass123", "new_password": "short"},
+            json={"current_password": "adminpass123", "new_password": "Sh0rt!"},
         )
         assert res.status_code == 422
 
@@ -49,9 +49,33 @@ class TestChangePassword:
         )
         assert res.status_code == 422
 
+    def test_rejects_password_missing_uppercase(self, client, admin_headers):
+        res = client.post(
+            "/api/v1/admin/auth/change-password",
+            headers=admin_headers,
+            json={"current_password": "adminpass123", "new_password": "newpassword456!"},
+        )
+        assert res.status_code == 422
+
+    def test_rejects_password_missing_symbol(self, client, admin_headers):
+        res = client.post(
+            "/api/v1/admin/auth/change-password",
+            headers=admin_headers,
+            json={"current_password": "adminpass123", "new_password": "NewPassword456"},
+        )
+        assert res.status_code == 422
+
+    def test_rejects_password_missing_digit(self, client, admin_headers):
+        res = client.post(
+            "/api/v1/admin/auth/change-password",
+            headers=admin_headers,
+            json={"current_password": "adminpass123", "new_password": "NewPassword!"},
+        )
+        assert res.status_code == 422
+
     def test_requires_admin(self, client):
         res = client.post(
             "/api/v1/admin/auth/change-password",
-            json={"current_password": "adminpass123", "new_password": "newpassword456"},
+            json={"current_password": "adminpass123", "new_password": "NewPassword456!"},
         )
         assert res.status_code in (401, 403)

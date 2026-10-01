@@ -4,6 +4,7 @@ import { ShieldCheck, ShieldOff, KeyRound } from 'lucide-react'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
 import AdminProfileMenu from '@/components/AdminProfileMenu'
 import OtpInput from '@/components/OtpInput'
+import PasswordStrengthChecklist, { isPasswordStrong } from '@/components/PasswordStrengthChecklist'
 import { getAdminSidebarItems } from '@/lib/adminNav'
 import { notify } from '@/lib/toast'
 import { adminFetch, getAdminToken, setAdminSession, type AdminSummary } from '@/lib/adminAuth'
@@ -134,8 +135,8 @@ export default function AdminSettingsPage() {
   }
 
   async function handleChangePassword() {
-    if (newPassword.length < 8) {
-      notify.error('Password too short', 'New password must be at least 8 characters.')
+    if (!isPasswordStrong(newPassword)) {
+      notify.error('Password too weak', 'Meet all the requirements shown below the New Password field.')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -312,7 +313,7 @@ export default function AdminSettingsPage() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                   />
-                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">At least 8 characters.</p>
+                  <PasswordStrengthChecklist password={newPassword} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -325,10 +326,18 @@ export default function AdminSettingsPage() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                   />
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <p className="mt-1 text-[11px] text-rose-500 dark:text-rose-400">Passwords don't match.</p>
+                  )}
                 </div>
                 <button
                   onClick={handleChangePassword}
-                  disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                  disabled={
+                    changingPassword ||
+                    !currentPassword ||
+                    !isPasswordStrong(newPassword) ||
+                    newPassword !== confirmPassword
+                  }
                   className="w-full rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
                 >
                   {changingPassword ? 'Changing...' : 'Change Password'}
