@@ -31,6 +31,7 @@ from app.models.survey import SurveyResponse
 from app.services.attendance_export import build_attendance_workbook, safe_filename
 from app.services.checkpoint_attendance import checkpoints_by_student
 from app.services.survey_export import build_survey_results_workbook
+from app.services.image_storage import is_trusted_image_url
 
 router = APIRouter(prefix="/officer/events", tags=["admin-events"], dependencies=[Depends(get_current_admin)])
 
@@ -143,6 +144,14 @@ def _validate_status(value: str):
         )
 
 
+def _validate_cover_image_url(value: str | None):
+    if value and not is_trusted_image_url(value):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cover image must come from the upload button, not a pasted URL.",
+        )
+
+
 @router.get("/")
 def list_all_events(db: Session = Depends(get_db)):
     """List every event regardless of status, for the admin table."""
@@ -153,6 +162,7 @@ def list_all_events(db: Session = Depends(get_db)):
 @router.post("/")
 def create_event(request: EventCreateRequest, db: Session = Depends(get_db)):
     _validate_status(request.status)
+    _validate_cover_image_url(request.cover_image_url)
 
     event = Event(
         name=request.name,
@@ -179,6 +189,7 @@ def create_event(request: EventCreateRequest, db: Session = Depends(get_db)):
 @router.put("/{event_id}")
 def update_event(event_id: str, request: EventUpdateRequest, db: Session = Depends(get_db)):
     _validate_status(request.status)
+    _validate_cover_image_url(request.cover_image_url)
 
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:

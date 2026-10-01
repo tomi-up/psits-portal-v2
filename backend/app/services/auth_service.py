@@ -67,6 +67,15 @@ class AuthService:
             logger.warning(f"Last name mismatch for student: {student_id}")
             raise ValidationException("Last name does not match student record")
 
+        # Student ID + last name alone are both guessable/knowable (class
+        # lists, printed IDs) - without this, anyone who signs up for their
+        # own Supabase account could claim a student's profile before the
+        # real student ever does. The newer google_login flow already
+        # enforces this same email cross-match; this path didn't.
+        if not student.email or student.email.strip().lower() != email.strip().lower():
+            logger.warning(f"Activation email mismatch for student: {student_id}")
+            raise ValidationException("Authenticated email does not match the email on file for this student")
+
         existing = self.db.query(Profile).filter(
             (Profile.auth_user_id == auth_user_id) | (Profile.student_id == student_id)
         ).first()

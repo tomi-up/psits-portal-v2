@@ -14,9 +14,14 @@ def verify_turnstile(token: str, remote_ip: str | None = None) -> bool:
     handlers, which run on FastAPI's worker thread pool rather than the
     event loop, so a blocking HTTP call here is safe."""
     if not settings.turnstile_secret_key:
-        # Not configured (e.g. local dev without a Cloudflare site set up) -
-        # fail open rather than lock everyone out.
-        return True
+        if settings.environment.lower() in {"development", "test"}:
+            # Not configured (e.g. local dev without a Cloudflare site set
+            # up) - fail open rather than lock everyone out.
+            return True
+        # Fail closed everywhere else: a staging/production deployment
+        # missing this env var should not silently disable bot protection
+        # in front of student-auth's custom endpoints.
+        return False
 
     payload = {"secret": settings.turnstile_secret_key, "response": token}
     if remote_ip:

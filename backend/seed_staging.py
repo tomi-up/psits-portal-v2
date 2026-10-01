@@ -6,6 +6,7 @@ Run against staging by setting DATABASE_URL (and the other required env
 vars) inline - see the invocation instructions given alongside this file.
 Never run this against the prod DATABASE_URL.
 """
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -35,16 +36,22 @@ def main():
 
     db = SessionLocal()
     try:
-        # Admin account
+        # Admin account - password must come from the environment so this
+        # script can't create a predictable, guessable login; never printed.
         if not db.query(AdminAccount).filter(AdminAccount.email == "admin@usm.edu.ph").first():
+            password = os.environ.get("STAGING_ADMIN_PASSWORD")
+            if not password:
+                raise SystemExit(
+                    "Set STAGING_ADMIN_PASSWORD in the environment before running this script."
+                )
             db.add(AdminAccount(
                 id=str(uuid.uuid4()),
                 email="admin@usm.edu.ph",
-                password_hash=hash_password("StagingAdmin@2026"),
+                password_hash=hash_password(password),
                 display_name="Staging Admin",
                 is_active=True,
             ))
-            print("Created admin account: admin@usm.edu.ph / StagingAdmin@2026")
+            print("Created admin account: admin@usm.edu.ph (password from STAGING_ADMIN_PASSWORD)")
 
         # Program
         program = db.query(Program).filter(Program.code == "BSCS").first()

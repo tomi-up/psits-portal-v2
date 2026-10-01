@@ -26,6 +26,19 @@ class ImageStorageError(Exception):
     pass
 
 
+def is_trusted_image_url(url: str) -> bool:
+    """True only for a URL this app's own upload_public_image could have
+    produced. Admin-set image fields (payment QR, event cover) are plain
+    text in the request body, not re-derived from an actual upload - without
+    this, any authenticated admin session could point a student-facing image
+    at an arbitrary host (e.g. a lookalike payment QR for financial fraud)."""
+    storage_project_url = (settings.supabase_storage_url or settings.supabase_url or "").rstrip("/")
+    if not storage_project_url:
+        return False
+    prefix = f"{storage_project_url}/storage/v1/object/public/"
+    return url.startswith(prefix) and len(url) > len(prefix)
+
+
 def validate_image(data: bytes) -> tuple[str, str]:
     if not data:
         raise ValueError("Choose an image to upload")

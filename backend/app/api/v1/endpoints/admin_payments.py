@@ -14,6 +14,7 @@ from app.core.deps import get_current_admin
 from app.models.admin import AdminAccount
 from app.models.student import Student, SchoolYear
 from app.models.balance import MembershipFee, Payment, OrgSettings
+from app.services.image_storage import is_trusted_image_url
 
 VALID_SEMESTERS = {"1ST", "2ND"}
 DEFAULT_FEE_AMOUNT = Decimal("100.00")
@@ -179,12 +180,19 @@ def get_payment_qr_setting(db: Session = Depends(get_db)):
 
 @router.put("/settings/payment-qr")
 def set_payment_qr_setting(body: QrSettingBody, db: Session = Depends(get_db)):
+    url = body.qr_image_url.strip()
+    if url and not is_trusted_image_url(url):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="QR image must come from the upload button, not a pasted URL.",
+        )
+
     settings_row = db.query(OrgSettings).first()
     if not settings_row:
         settings_row = OrgSettings()
         db.add(settings_row)
 
-    settings_row.payment_qr_image_url = body.qr_image_url.strip() or None
+    settings_row.payment_qr_image_url = url or None
     db.commit()
 
     return {"qr_image_url": settings_row.payment_qr_image_url}
