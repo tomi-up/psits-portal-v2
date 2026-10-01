@@ -3,14 +3,13 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    auth, student_auth, events_mvp, admin_events, admin_auth, admin_students, admin_excuse_requests,
+    student_auth, events_mvp, admin_events, admin_auth, admin_students, admin_excuse_requests,
     balance, admin_payments, news, sanctions, admin_sanctions, survey, admin_officers, scanner,
     admin_attendance_reviews, admin_inventory, admin_uploads,
 )
 
 api_router = APIRouter(prefix="/api/v1")
 
-api_router.include_router(auth.router)
 api_router.include_router(student_auth.router)
 api_router.include_router(events_mvp.router)
 api_router.include_router(admin_auth.router)

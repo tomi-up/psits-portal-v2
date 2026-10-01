@@ -35,9 +35,16 @@ class Settings(BaseSettings):
     cors_allow_headers: str = "*"
     trusted_hosts: str = ""
 
-    # Supabase Auth (REQUIRED - the authentication provider)
+    # Supabase Storage (REQUIRED - backs admin image uploads; see
+    # app/services/image_storage.py). Not an auth provider here - student
+    # login is Google Sign-In, admin login is email+password, both decoupled
+    # from Supabase.
     supabase_url: str
-    supabase_key: str
+    # No longer read anywhere - Supabase stopped being an auth provider -
+    # but kept as an optional field so an existing deployment's env (which
+    # may still have this set) doesn't fail Settings validation over an
+    # unrecognized var.
+    supabase_key: Optional[str] = None
     supabase_service_role_key: Optional[str] = None
     supabase_storage_url: Optional[str] = None
     supabase_storage_bucket: str = "psits-uploads"

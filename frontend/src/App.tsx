@@ -1,14 +1,7 @@
-import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { useAuthStore } from '@/stores/authStore'
-import { RequireAuth, RequireSessionNoProfile, RequireGuest } from '@/components/RouteGuards'
 import RequireAdmin from '@/components/RequireAdmin'
 import LoginPage from '@/pages/LoginPage'
-import SignupPage from '@/pages/SignupPage'
-import CheckEmailPage from '@/pages/CheckEmailPage'
-import ActivatePage from '@/pages/ActivatePage'
-import DashboardPage from '@/pages/DashboardPage'
 import LandingPage from '@/pages/LandingPage'
 import StudentDashboardPage from '@/pages/StudentDashboardPage'
 import StudentEventsPage from '@/pages/StudentEventsPage'
@@ -35,31 +28,13 @@ import UnauthorizedPage from '@/pages/UnauthorizedPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
 export default function App() {
-  const init = useAuthStore((s) => s.init)
-
-  useEffect(() => {
-    void init()
-  }, [init])
-
   return (
     <Router>
       <Toaster position="top-right" gutter={12} toastOptions={{ duration: 4000 }} />
       <Routes>
-        <Route element={<RequireGuest />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/check-email" element={<CheckEmailPage />} />
-        </Route>
-
-        <Route element={<RequireSessionNoProfile />}>
-          <Route path="/activate" element={<ActivatePage />} />
-        </Route>
+        <Route path="/login" element={<LoginPage />} />
 
         <Route path="/" element={<LandingPage />} />
-
-        <Route element={<RequireAuth />}>
-          <Route path="/legacy-dashboard" element={<DashboardPage />} />
-        </Route>
 
         {/* MVP Student Dashboard - passwordless auth, reads from localStorage */}
         <Route path="/dashboard" element={<StudentDashboardPage />} />

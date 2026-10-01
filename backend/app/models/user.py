@@ -1,14 +1,16 @@
-"""Profile, Role, and Permission models.
+"""Profile model.
 
-Note: There is no `User` model here - Supabase Auth's `auth.users` table
-(managed entirely by Supabase) is the source of truth for accounts and
-credentials. `Profile.auth_user_id` links our application data back to it.
+Note: There is no `User` model here. `Profile.auth_user_id` is a vestige of
+an earlier Supabase-Auth-based design (removed) that's no longer written
+with a real external id - student_auth.py's Google Sign-In flow is the only
+thing creating profiles now, and sets it to a random UUID since nothing
+reads it as a real identity reference anymore.
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Table, Enum as SQLEnum, TEXT, Index, Integer, Boolean, func
+from sqlalchemy import Column, String, Enum as SQLEnum, Index
 import enum
 
-from app.models.base import BaseModel, Base
+from app.models.base import BaseModel
 
 
 class AccountStatus(str, enum.Enum):
@@ -44,62 +46,3 @@ class Profile(BaseModel):
 
     def __repr__(self):
         return f"<Profile(auth_user_id={self.auth_user_id}, display_name={self.display_name})>"
-
-
-class Role(BaseModel):
-    """Role definition (e.g. TREASURER, STUDENT)."""
-
-    __tablename__ = "roles"
-
-    code = Column(String(50), unique=True, nullable=False)
-    name = Column(String(100), unique=True, nullable=False, index=True)
-    description = Column(TEXT, nullable=True)
-    is_active = Column(Boolean, default=True)
-    order = Column(Integer, default=0)
-
-    __table_args__ = (
-        Index('ix_roles_code', 'code'),
-        Index('ix_roles_is_active', 'is_active'),
-    )
-
-    def __repr__(self):
-        return f"<Role(code={self.code}, name={self.name})>"
-
-
-class Permission(BaseModel):
-    """Permission definition (e.g. payments.void)."""
-
-    __tablename__ = "permissions"
-
-    code = Column(String(100), unique=True, nullable=False)
-    description = Column(TEXT, nullable=True)
-    category = Column(String(50))
-
-    __table_args__ = (
-        Index('ix_permissions_code', 'code'),
-        Index('ix_permissions_category', 'category'),
-    )
-
-    def __repr__(self):
-        return f"<Permission(code={self.code})>"
-
-
-# Join tables are plain SQLAlchemy Core Tables (not mapped ORM relationships).
-# A prior attempt at ORM many-to-many relationships here caused ambiguous
-# foreign-key errors; the service layer queries these directly instead.
-
-user_roles = Table(
-    "user_roles",
-    Base.metadata,
-    Column("user_id", String(36), ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", String(36), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("assigned_at", DateTime, server_default=func.now()),
-)
-
-role_permissions = Table(
-    "role_permissions",
-    Base.metadata,
-    Column("role_id", String(36), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("permission_id", String(36), ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
-    Column("granted_at", DateTime, server_default=func.now()),
-)
