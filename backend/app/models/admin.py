@@ -5,6 +5,8 @@ directly (no Supabase involved), since the admin panel needs to be usable
 before Supabase Auth is wired up.
 """
 
+import uuid
+
 from sqlalchemy import Column, String, Boolean, TEXT
 
 from app.models.base import BaseModel
@@ -26,6 +28,12 @@ class AdminAccount(BaseModel):
     # accidentally treated as "2FA is required."
     totp_secret = Column(TEXT, nullable=True)
     mfa_enabled = Column(Boolean, default=False, nullable=False)
+    # Embedded in every admin JWT as the "sec" claim and re-checked on every
+    # request (app.core.deps.get_current_admin). Regenerated on password
+    # change so every previously-issued token - a 12-hour admin JWT has no
+    # other revocation mechanism - stops working immediately instead of
+    # staying valid until it naturally expires.
+    security_stamp = Column(String(36), nullable=False, default=lambda: str(uuid.uuid4()))
 
     def __repr__(self):
         return f"<AdminAccount(email={self.email})>"

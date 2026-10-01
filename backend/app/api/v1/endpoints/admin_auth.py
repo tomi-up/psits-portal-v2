@@ -4,6 +4,7 @@ plus optional TOTP 2FA layered on top of it."""
 import base64
 import io
 import re
+import uuid
 
 import pyotp
 import qrcode
@@ -76,6 +77,12 @@ class AdminMFAStatusResponse(BaseModel):
     message: str
 
 
+class AdminChangePasswordResponse(BaseModel):
+    status: str
+    message: str
+    access_token: str
+
+
 class AdminMFAResetRequest(BaseModel):
     password: str
 
@@ -108,7 +115,7 @@ def admin_login(request: Request, body: AdminLoginRequest, db: Session = Depends
             pending_token=pending_token, expires_in_seconds=MFA_PENDING_TOKEN_MINUTES * 60,
         )
 
-    token = create_access_token(subject=admin.id)
+    token = create_access_token(subject=admin.id, extra_claims={"sec": admin.security_stamp})
     return AdminLoginResponse(
         access_token=token,
         expires_in=60 * 60 * 12,
@@ -131,7 +138,7 @@ def admin_login_verify_mfa(request: Request, body: AdminMFAVerifyRequest, db: Se
     if not pyotp.TOTP(secret).verify(body.totp_code, valid_window=1):
         raise UnauthorizedException("Invalid authentication code")
 
-    token = create_access_token(subject=admin.id)
+    token = create_access_token(subject=admin.id, extra_claims={"sec": admin.security_stamp})
     return AdminLoginResponse(
         access_token=token,
         expires_in=60 * 60 * 12,
@@ -234,7 +241,7 @@ def admin_mfa_reset(
     return AdminMFAStatusResponse(status="DISABLED", message="Two-factor authentication has been turned off.")
 
 
-@router.post("/change-password", response_model=AdminMFAStatusResponse)
+@router.post("/change-password", response_model=AdminChangePasswordResponse)
 @limiter.limit("5/minute")
 def admin_change_password(
     request: Request, body: AdminChangePasswordRequest, admin: AdminAccount = Depends(get_current_admin),
@@ -263,6 +270,15 @@ def admin_change_password(
         )
 
     admin.password_hash = hash_password(body.new_password)
+    # Invalidates every token issued before this moment - including the one
+    # used to make this very request - since a 12-hour admin JWT otherwise
+    # has no other way to be revoked early. A fresh token is issued below so
+    # this session keeps working; every other session (e.g. a leaked token,
+    # or another device) stops working the instant this commits.
+    admin.security_stamp = str(uuid.uuid4())
     db.commit()
 
-    return AdminMFAStatusResponse(status="CHANGED", message="Your password has been changed.")
+    new_token = create_access_token(subject=admin.id, extra_claims={"sec": admin.security_stamp})
+    return AdminChangePasswordResponse(
+        status="CHANGED", message="Your password has been changed.", access_token=new_token,
+    )

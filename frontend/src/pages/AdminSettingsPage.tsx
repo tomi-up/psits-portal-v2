@@ -156,7 +156,11 @@ export default function AdminSettingsPage() {
         notify.error('Could not change password', data.detail || 'Please try again.')
         return
       }
-      notify.success('Password changed', 'Use your new password next time you sign in.')
+      // The old token is now invalid server-side (changing the password
+      // rotates the account's session stamp so every other session gets
+      // signed out too) - adopt the fresh one so this tab keeps working.
+      if (data.access_token && admin) setAdminSession(data.access_token, admin)
+      notify.success('Password changed', 'Your other sessions have been signed out.')
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')

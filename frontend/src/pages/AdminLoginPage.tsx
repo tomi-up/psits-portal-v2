@@ -10,9 +10,11 @@ export default function AdminLoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const rawRedirect = searchParams.get('redirect')
-  // Only ever redirect to a same-app relative path - reject absolute/protocol-relative
-  // URLs so a crafted ?redirect= can't send an admin off-site after login.
-  const redirectTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
+  // Only ever redirect to a same-app relative path - reject absolute/
+  // protocol-relative URLs (//evil.com) AND a leading backslash (\evil.com,
+  // /\evil.com), which some browsers normalize to protocol-relative too -
+  // so a crafted ?redirect= can't send an admin off-site after login.
+  const redirectTo = rawRedirect && /^\/[^/\\]/.test(rawRedirect)
     ? rawRedirect
     : '/admin/events'
   const [email, setEmail] = useState('')

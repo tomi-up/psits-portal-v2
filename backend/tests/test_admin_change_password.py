@@ -25,6 +25,31 @@ class TestChangePassword:
         )
         assert login.status_code == 200, login.text
 
+    def test_changing_password_invalidates_the_old_token_but_returns_a_working_new_one(
+        self, client, admin_headers
+    ):
+        """A 12-hour admin JWT has no other revocation mechanism - without
+        this, a leaked/stolen token (or a session on another device) would
+        stay valid for up to 12 hours after the real owner changes their
+        password specifically to shut that access down."""
+        res = client.post(
+            "/api/v1/admin/auth/change-password",
+            headers=admin_headers,
+            json={"current_password": "adminpass123", "new_password": "NewPassword456!"},
+        )
+        assert res.status_code == 200, res.text
+        new_token = res.json()["access_token"]
+
+        # The token used to make the change-password call itself is now dead...
+        old_session_check = client.get("/api/v1/admin/auth/me", headers=admin_headers)
+        assert old_session_check.status_code == 401
+
+        # ...but the fresh token the response handed back works immediately.
+        new_session_check = client.get(
+            "/api/v1/admin/auth/me", headers={"Authorization": f"Bearer {new_token}"}
+        )
+        assert new_session_check.status_code == 200
+
     def test_rejects_wrong_current_password(self, client, admin_headers):
         res = client.post(
             "/api/v1/admin/auth/change-password",

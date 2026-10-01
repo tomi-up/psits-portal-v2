@@ -30,6 +30,12 @@ def get_current_admin(
     if not admin or not admin.is_active:
         raise UnauthorizedException("Account not found or disabled")
 
+    # Re-checking this on every request - not just trusting the signed token -
+    # is what lets a password change invalidate every token issued before it,
+    # rather than each one staying valid until its own 12-hour expiry.
+    if payload.get("sec") != admin.security_stamp:
+        raise UnauthorizedException("Session no longer valid - please sign in again")
+
     return admin
 
 
