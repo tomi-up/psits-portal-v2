@@ -31,7 +31,23 @@ class TestChangePassword:
             headers=admin_headers,
             json={"current_password": "wrong-password", "new_password": "NewPassword456!"},
         )
-        assert res.status_code == 401
+        assert res.status_code == 400
+
+    def test_wrong_current_password_does_not_invalidate_the_session(self, client, admin_headers):
+        """Regression test: a wrong current password must not look like an
+        expired/invalid session to the caller - the frontend's adminFetch()
+        wrapper force-logs-out on any 401, so this endpoint returning 401
+        here used to silently end a perfectly valid admin session over a
+        mistyped password."""
+        wrong = client.post(
+            "/api/v1/admin/auth/change-password",
+            headers=admin_headers,
+            json={"current_password": "wrong-password", "new_password": "NewPassword456!"},
+        )
+        assert wrong.status_code == 400
+
+        me = client.get("/api/v1/admin/auth/me", headers=admin_headers)
+        assert me.status_code == 200
 
     def test_rejects_short_new_password(self, client, admin_headers):
         res = client.post(

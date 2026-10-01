@@ -35,7 +35,7 @@ class TestEnrollAndConfirm:
             headers=admin_headers,
             json={"setup_token": setup_token, "totp_code": "000000"},
         )
-        assert confirm.status_code == 401
+        assert confirm.status_code == 400
 
     def test_enroll_requires_admin(self, client):
         res = client.post("/api/v1/admin/auth/mfa/enroll")
@@ -162,7 +162,7 @@ class TestResetMfa:
         res = client.post(
             "/api/v1/admin/auth/mfa/reset", headers=admin_headers, json={"password": "wrong-password"},
         )
-        assert res.status_code == 401
+        assert res.status_code == 400
 
     def test_reset_requires_admin(self, client):
         res = client.post("/api/v1/admin/auth/mfa/reset", json={"password": "adminpass123"})

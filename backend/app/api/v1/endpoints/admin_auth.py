@@ -186,12 +186,17 @@ def admin_mfa_confirm(
         )
 
     if setup_data["subject_id"] != admin.id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Setup session does not match this account")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Setup session does not match this account")
 
     secret = setup_data["secret"]
     if not pyotp.TOTP(secret).verify(body.totp_code, valid_window=1):
+        # 400, not 401: the admin's own session/token is perfectly valid here -
+        # only the TOTP code they typed was wrong. adminFetch() on the
+        # frontend force-logs-out on any 401 (correct for an actually-expired
+        # session), so a 401 here would silently end a valid session over a
+        # mistyped 6-digit code.
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect code. Check your authenticator app and try again.",
         )
 
@@ -214,7 +219,13 @@ def admin_mfa_reset(
     is a security-lowering action, not just a settings tweak."""
 
     if not verify_password(body.password, admin.password_hash):
-        raise UnauthorizedException("Incorrect password")
+        # 400, not 401 - see the matching note in admin_mfa_confirm: the
+        # admin's session is valid, only the password they typed was wrong,
+        # and adminFetch() force-logs-out on any 401 it sees. Raised as a
+        # plain HTTPException (not the AppException-style UnauthorizedException
+        # that used to live here) so its `detail` key matches what the
+        # Settings page's error handling reads.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect password")
 
     admin.totp_secret = None
     admin.mfa_enabled = False
@@ -230,7 +241,13 @@ def admin_change_password(
     db: Session = Depends(get_db),
 ):
     if not verify_password(body.current_password, admin.password_hash):
-        raise UnauthorizedException("Current password is incorrect")
+        # 400, not 401 - see the matching note in admin_mfa_confirm: the
+        # admin's session is valid, only the password they typed was wrong,
+        # and adminFetch() force-logs-out on any 401 it sees. Raised as a
+        # plain HTTPException (not the AppException-style UnauthorizedException
+        # that used to live here) so its `detail` key matches what the
+        # Settings page's error handling reads.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
     if len(body.new_password.encode('utf-8')) > 72:
         raise HTTPException(
