@@ -1,7 +1,8 @@
 """Admin review of student-submitted membership payments, and the shared
 payment QR code setting shown to every student on their Balance page."""
 
-from datetime import datetime, timezone
+import re
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -78,6 +79,13 @@ class SchoolYearOption(BaseModel):
     id: str
     label: str
     is_active: bool
+
+
+class CreateSchoolYearBody(BaseModel):
+    label: str  # e.g. "2025-2026"
+    start_date: date
+    end_date: date
+    is_active: bool = False
 
 
 @router.get("/payments/")
@@ -223,6 +231,46 @@ def list_school_years(db: Session = Depends(get_db)):
             SchoolYearOption(id=y.id, label=y.label, is_active=y.is_active) for y in years
         ]
     }
+
+
+@router.post("/school-years")
+def create_school_year(
+    body: CreateSchoolYearBody, db: Session = Depends(get_db), admin: AdminAccount = Depends(get_current_admin)
+):
+    """Add a new academic year. Semesters are always 1ST/2ND for every
+    year - there's nothing semester-related to configure here."""
+
+    label = body.label.strip()
+    if not re.fullmatch(r"\d{4}-\d{4}", label):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Label must look like 2025-2026"
+        )
+    if int(label[5:9]) != int(label[:4]) + 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The second year must follow the first"
+        )
+    if body.start_date >= body.end_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Start date must be before end date"
+        )
+
+    existing = db.query(SchoolYear).filter(SchoolYear.label == label).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"{label} already exists")
+
+    if body.is_active:
+        db.query(SchoolYear).update({SchoolYear.is_active: False})
+
+    school_year = SchoolYear(
+        label=label,
+        start_date=datetime.combine(body.start_date, datetime.min.time(), tzinfo=timezone.utc),
+        end_date=datetime.combine(body.end_date, datetime.min.time(), tzinfo=timezone.utc),
+        is_active=body.is_active,
+    )
+    db.add(school_year)
+    db.commit()
+
+    return SchoolYearOption(id=school_year.id, label=school_year.label, is_active=school_year.is_active)
 
 
 @router.post("/balances/")

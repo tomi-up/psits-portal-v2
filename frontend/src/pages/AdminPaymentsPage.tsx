@@ -97,6 +97,13 @@ export default function AdminPaymentsPage() {
   const [newBalanceAmount, setNewBalanceAmount] = useState('100')
   const [addingBalance, setAddingBalance] = useState(false)
 
+  const [addSchoolYearOpen, setAddSchoolYearOpen] = useState(false)
+  const [newYearLabel, setNewYearLabel] = useState('')
+  const [newYearStart, setNewYearStart] = useState('')
+  const [newYearEnd, setNewYearEnd] = useState('')
+  const [newYearActive, setNewYearActive] = useState(false)
+  const [addingSchoolYear, setAddingSchoolYear] = useState(false)
+
   // Submissions table: search, term filter, pagination
   const [paymentSearch, setPaymentSearch] = useState('')
   const [paymentTermFilter, setPaymentTermFilter] = useState('ALL')
@@ -187,6 +194,62 @@ export default function AdminPaymentsPage() {
     setNewBalanceSemester('1ST')
     setNewBalanceAmount('100')
     setAddBalanceOpen(true)
+  }
+
+  function openAddBalanceForStudent(row: BalanceRow) {
+    setNewBalanceStudentId(row.student_id)
+    setNewBalanceSchoolYearId(schoolYearOptions.find((y) => y.is_active)?.id ?? schoolYearOptions[0]?.id ?? '')
+    setNewBalanceSemester('1ST')
+    setNewBalanceAmount('100')
+    setAddBalanceOpen(true)
+  }
+
+  function openAddSchoolYear() {
+    setNewYearLabel('')
+    setNewYearStart('')
+    setNewYearEnd('')
+    setNewYearActive(false)
+    setAddSchoolYearOpen(true)
+  }
+
+  async function handleCreateSchoolYear() {
+    const label = newYearLabel.trim()
+    if (!/^\d{4}-\d{4}$/.test(label)) {
+      notify.error('Invalid label', 'Use the format 2025-2026.')
+      return
+    }
+    if (!newYearStart || !newYearEnd) {
+      notify.error('Missing dates', 'Please set a start and end date.')
+      return
+    }
+
+    setAddingSchoolYear(true)
+    try {
+      const res = await adminFetch(`${API}/officer/school-years`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label,
+          start_date: newYearStart,
+          end_date: newYearEnd,
+          is_active: newYearActive,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        notify.error('Could not add school year', err.detail || 'Please try again.')
+        return
+      }
+      const created = await res.json()
+      notify.success('School year added', `${label} is now available.`)
+      setAddSchoolYearOpen(false)
+      await loadSchoolYearOptions()
+      setNewBalanceSchoolYearId(created.id)
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setAddingSchoolYear(false)
+    }
   }
 
   async function handleCreateBalance() {
@@ -751,13 +814,22 @@ export default function AdminPaymentsPage() {
             <div className="space-y-3 border-b border-slate-100 dark:border-slate-800 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-slate-500 dark:text-slate-400">Record a payment directly - e.g. cash paid in person.</p>
-                <button
-                  onClick={openAddBalance}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Balance
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={openAddSchoolYear}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    School Year
+                  </button>
+                  <button
+                    onClick={openAddBalance}
+                    className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Balance
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -876,16 +948,23 @@ export default function AdminPaymentsPage() {
                           )}
                         </td>
                         <td className="px-5 py-3 text-right">
-                          {row.status === 'PAID' ? (
-                            <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
-                          ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            {row.status !== 'PAID' && (
+                              <button
+                                onClick={() => openRecordForm(row)}
+                                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700"
+                              >
+                                Record Payment
+                              </button>
+                            )}
                             <button
-                              onClick={() => openRecordForm(row)}
-                              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700"
+                              onClick={() => openAddBalanceForStudent(row)}
+                              title={`Add another balance for ${row.student_name}`}
+                              className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 text-slate-500 dark:text-slate-400 transition hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
-                              Record Payment
+                              <Plus className="h-3.5 w-3.5" />
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1016,7 +1095,16 @@ export default function AdminPaymentsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">School Year</label>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">School Year</label>
+                    <button
+                      type="button"
+                      onClick={openAddSchoolYear}
+                      className="text-xs font-medium text-sky-600 dark:text-sky-400 hover:underline"
+                    >
+                      + New
+                    </button>
+                  </div>
                   <select
                     value={newBalanceSchoolYearId}
                     onChange={(e) => setNewBalanceSchoolYearId(e.target.value)}
@@ -1065,6 +1153,84 @@ export default function AdminPaymentsPage() {
 
             <button
               onClick={() => setAddBalanceOpen(false)}
+              className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {addSchoolYearOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setAddSchoolYearOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Add School Year</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Semesters are always 1st and 2nd for every school year - nothing to configure there.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Label</label>
+                <input
+                  type="text"
+                  value={newYearLabel}
+                  onChange={(e) => setNewYearLabel(e.target.value)}
+                  placeholder="e.g. 2025-2026"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Start Date</label>
+                  <input
+                    type="date"
+                    value={newYearStart}
+                    onChange={(e) => setNewYearStart(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">End Date</label>
+                  <input
+                    type="date"
+                    value={newYearEnd}
+                    onChange={(e) => setNewYearEnd(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={newYearActive}
+                  onChange={(e) => setNewYearActive(e.target.checked)}
+                  className="rounded border-slate-300 dark:border-slate-600"
+                />
+                Set as the active school year
+              </label>
+              {newYearActive && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  This replaces whichever school year is currently active.
+                </p>
+              )}
+              <button
+                onClick={handleCreateSchoolYear}
+                disabled={addingSchoolYear}
+                className="w-full rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+              >
+                {addingSchoolYear ? 'Adding...' : 'Add School Year'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setAddSchoolYearOpen(false)}
               className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Cancel
