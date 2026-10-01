@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, Moon, RefreshCw, Sun } from 'lucide-react'
+import { ChevronDown, LogOut, Moon, RefreshCw, Settings, Sun } from 'lucide-react'
 import { confirmAction } from '@/lib/confirm'
 import { clearAdminSession, getAdminUser } from '@/lib/adminAuth'
 import { applyTheme, getStoredTheme, type Theme } from '@/lib/theme'
@@ -97,6 +97,16 @@ export default function AdminProfileMenu({
           {open && (
             <div className="absolute right-0 z-20 mt-2 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-800">
               <p className="truncate px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500">{admin.email}</p>
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  navigate('/admin/settings')
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:hover:bg-rose-950/40"

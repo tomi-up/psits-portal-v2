@@ -9,7 +9,7 @@ import { notify } from '@/lib/toast'
 import { adminFetch, getAdminToken, setAdminSession, type AdminSummary } from '@/lib/adminAuth'
 import { API } from '@/lib/apiBase'
 
-export default function AdminSecurityPage() {
+export default function AdminSettingsPage() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [admin, setAdmin] = useState<AdminSummary | null>(null)
@@ -133,7 +133,7 @@ export default function AdminSecurityPage() {
         title="PSITS Admin"
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        items={getAdminSidebarItems('security', navigate, () => navigate('/admin/events'))}
+        items={getAdminSidebarItems('settings', navigate, () => navigate('/admin/events'))}
       />
 
       <div className="lg:pl-64">
@@ -141,8 +141,8 @@ export default function AdminSecurityPage() {
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMenuOpen(true)} />
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Security</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Two-factor authentication for your admin account</p>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Settings</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Manage your admin account</p>
             </div>
           </div>
           <AdminProfileMenu />
@@ -150,6 +150,13 @@ export default function AdminSecurityPage() {
 
         <main className="px-6 py-8 lg:px-10">
           <div className="mx-auto max-w-xl space-y-6">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Two-Factor Authentication</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Require a code from an authenticator app in addition to your password.
+              </p>
+            </div>
+
             {loading ? (
               <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />
             ) : (

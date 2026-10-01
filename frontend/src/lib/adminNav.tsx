@@ -12,7 +12,6 @@ import {
   BookOpen,
   FileWarning,
   Newspaper,
-  Lock,
 } from 'lucide-react'
 import type { SidebarItem } from '@/components/Sidebar'
 
@@ -29,7 +28,7 @@ export type AdminPage =
   | 'sanctions'
   | 'permissions'
   | 'students'
-  | 'security'
+  | 'settings'
   | 'help'
 
 export function getAdminSidebarItems(
@@ -121,13 +120,6 @@ export function getAdminSidebarItems(
       section: 'Coming Soon',
     },
 
-    {
-      icon: <Lock className="h-4 w-4" />,
-      label: 'Security',
-      active: active === 'security',
-      onClick: () => navigate('/admin/security'),
-      section: 'Support',
-    },
     {
       icon: <BookOpen className="h-4 w-4" />,
       label: 'Help & Guide',

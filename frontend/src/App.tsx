@@ -27,7 +27,7 @@ import AdminPaymentsPage from '@/pages/AdminPaymentsPage'
 import AdminNewsPage from '@/pages/AdminNewsPage'
 import AdminSanctionsPage from '@/pages/AdminSanctionsPage'
 import AdminInventoryPage from '@/pages/AdminInventoryPage'
-import AdminSecurityPage from '@/pages/AdminSecurityPage'
+import AdminSettingsPage from '@/pages/AdminSettingsPage'
 import AdminHelpPage from '@/pages/AdminHelpPage'
 import QRScannerPage from '@/pages/QRScannerPage'
 import CheckpointScannerPage from '@/pages/CheckpointScannerPage'
@@ -85,7 +85,7 @@ export default function App() {
           <Route path="/admin/news" element={<AdminNewsPage />} />
           <Route path="/admin/sanctions" element={<AdminSanctionsPage />} />
           <Route path="/admin/inventory" element={<AdminInventoryPage />} />
-          <Route path="/admin/security" element={<AdminSecurityPage />} />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
           <Route path="/admin/help" element={<AdminHelpPage />} />
 
           {/* Legacy two-scan scanner - an admin must be logged in on this device */}
