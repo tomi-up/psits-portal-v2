@@ -139,7 +139,9 @@ def load_source() -> tuple[list[dict[str, object]], str, int, int]:
     if source_url == settings.database_url:
         raise ValueError("PRODUCTION_DATABASE_URL and DATABASE_URL must not be the same")
 
-    source_engine = create_engine(source_url, pool_pre_ping=True)
+    # hide_parameters: keeps student data (names, emails) out of any
+    # traceback this script prints or logs if a query ever fails.
+    source_engine = create_engine(source_url, pool_pre_ping=True, hide_parameters=True)
     with Session(source_engine) as source:
         records = (
             source.query(Student, StudentSchoolYear, Program)
@@ -181,7 +183,7 @@ def prepare(commit: bool, emails_path: Path | None, event_id: str | None) -> Non
         "enrollments_updated", "emails_applied", "fees_created", "fees_updated",
         "programs_created",
     )}
-    target_engine = create_engine(settings.database_url, pool_pre_ping=True)
+    target_engine = create_engine(settings.database_url, pool_pre_ping=True, hide_parameters=True)
     with Session(target_engine) as db:
         try:
             school_year = db.query(SchoolYear).filter(SchoolYear.label == SCHOOL_YEAR_LABEL).first()
