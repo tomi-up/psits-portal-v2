@@ -28,6 +28,12 @@ export default function AdminSettingsPage() {
   const [resetPassword, setResetPassword] = useState('')
   const [resetting, setResetting] = useState(false)
 
+  // Change password
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+
   useEffect(() => {
     void loadStatus()
   }, [])
@@ -124,6 +130,39 @@ export default function AdminSettingsPage() {
       notify.error('Network error', 'Could not reach the server.')
     } finally {
       setResetting(false)
+    }
+  }
+
+  async function handleChangePassword() {
+    if (newPassword.length < 8) {
+      notify.error('Password too short', 'New password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      notify.error("Passwords don't match", 'Re-enter the new password to confirm.')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await adminFetch(`${API}/admin/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        notify.error('Could not change password', data.detail || 'Please try again.')
+        return
+      }
+      notify.success('Password changed', 'Use your new password next time you sign in.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -240,6 +279,62 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
             )}
+
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Password</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Change the password you sign in with.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">At least 8 characters.</p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+                  className="w-full rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+                >
+                  {changingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </div>
           </div>
         </main>
       </div>

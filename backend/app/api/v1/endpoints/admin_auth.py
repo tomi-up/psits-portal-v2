@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from app.core.database import get_db
-from app.core.security import verify_password, create_access_token, decode_access_token
+from app.core.security import verify_password, hash_password, create_access_token, decode_access_token
 from app.core.exceptions import UnauthorizedException
 from app.core.rate_limit import limiter
 from app.core.deps import get_current_admin
@@ -73,6 +73,11 @@ class AdminMFAStatusResponse(BaseModel):
 
 class AdminMFAResetRequest(BaseModel):
     password: str
+
+
+class AdminChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 @router.post("/login")
@@ -211,3 +216,27 @@ def admin_mfa_reset(
     db.commit()
 
     return AdminMFAStatusResponse(status="DISABLED", message="Two-factor authentication has been turned off.")
+
+
+@router.post("/change-password", response_model=AdminMFAStatusResponse)
+@limiter.limit("5/minute")
+def admin_change_password(
+    request: Request, body: AdminChangePasswordRequest, admin: AdminAccount = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(body.current_password, admin.password_hash):
+        raise UnauthorizedException("Current password is incorrect")
+
+    if len(body.new_password.encode('utf-8')) > 72:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="New password cannot exceed 72 characters",
+        )
+    if len(body.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="New password must be at least 8 characters",
+        )
+
+    admin.password_hash = hash_password(body.new_password)
+    db.commit()
+
+    return AdminMFAStatusResponse(status="CHANGED", message="Your password has been changed.")
