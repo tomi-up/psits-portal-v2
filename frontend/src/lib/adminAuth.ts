@@ -5,6 +5,7 @@ export interface AdminSummary {
   id: string
   email: string
   display_name: string
+  mfa_enabled: boolean
 }
 
 export function getAdminToken(): string | null {

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import AuthLayout from '@/components/AuthLayout'
+import OtpInput from '@/components/OtpInput'
 import { notify } from '@/lib/toast'
 import { setAdminSession } from '@/lib/adminAuth'
 import { API } from '@/lib/apiBase'
@@ -17,6 +18,10 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [pendingToken, setPendingToken] = useState<string | null>(null)
+  const [totpCode, setTotpCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -40,6 +45,11 @@ export default function AdminLoginPage() {
         return
       }
 
+      if (data.status === 'MFA_REQUIRED') {
+        setPendingToken(data.pending_token)
+        return
+      }
+
       setAdminSession(data.access_token, data.admin)
       notify.success('Welcome back', data.admin.display_name)
       navigate(redirectTo, { replace: true })
@@ -48,6 +58,73 @@ export default function AdminLoginPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  async function handleVerifyCode(e: FormEvent) {
+    e.preventDefault()
+    if (totpCode.length !== 6 || !pendingToken) return
+    setVerifying(true)
+
+    try {
+      const res = await fetch(`${API}/admin/auth/login/verify-mfa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pending_token: pendingToken, totp_code: totpCode }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          notify.error('Too many attempts', 'Please wait a bit before trying again.')
+        } else {
+          notify.error('Incorrect code', data.message || 'Check your authenticator app and try again.')
+        }
+        setTotpCode('')
+        return
+      }
+
+      setAdminSession(data.access_token, data.admin)
+      notify.success('Welcome back', data.admin.display_name)
+      navigate(redirectTo, { replace: true })
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  if (pendingToken) {
+    return (
+      <AuthLayout>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Enter your code</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Open your authenticator app and enter the 6-digit code for this account.
+        </p>
+
+        <form onSubmit={handleVerifyCode} className="mt-8 space-y-4">
+          <OtpInput value={totpCode} onChange={setTotpCode} autoFocus />
+
+          <button
+            type="submit"
+            disabled={verifying || totpCode.length !== 6}
+            className="w-full rounded-xl bg-sky-600 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {verifying ? 'Verifying...' : 'Verify'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPendingToken(null)
+              setTotpCode('')
+            }}
+            className="w-full text-center text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            Back to sign in
+          </button>
+        </form>
+      </AuthLayout>
+    )
   }
 
   return (

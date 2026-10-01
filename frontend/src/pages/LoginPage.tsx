@@ -1,6 +1,6 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import AuthLayout from '@/components/AuthLayout'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import TurnstileWidget from '@/components/TurnstileWidget'
@@ -93,6 +93,8 @@ export default function LoginPage() {
 
   if (needsStudentIdFor) {
     return (
+      <>
+      {isGoogleSubmitting && <SigningInOverlay />}
       <AuthLayout>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Link your Google account</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -151,12 +153,15 @@ export default function LoginPage() {
           </button>
         </form>
       </AuthLayout>
+      </>
     )
   }
 
   const canSignIn = Boolean(turnstileToken) && agreedToTerms
 
   return (
+    <>
+    {isGoogleSubmitting && <SigningInOverlay />}
     <AuthLayout>
       <Link
         to="/"
@@ -257,5 +262,15 @@ export default function LoginPage() {
         </div>
       )}
     </AuthLayout>
+    </>
+  )
+}
+
+function SigningInOverlay() {
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-sm dark:bg-slate-950/80">
+      <Loader2 className="h-8 w-8 animate-spin text-sky-600 dark:text-sky-400" />
+      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Signing you in...</p>
+    </div>
   )
 }

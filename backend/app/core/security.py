@@ -81,9 +81,14 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_access_token(
-    subject: str, extra_claims: dict[str, Any] | None = None, token_type: str = "admin"
+    subject: str,
+    extra_claims: dict[str, Any] | None = None,
+    token_type: str = "admin",
+    expires_minutes: int | None = None,
 ) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=expires_minutes if expires_minutes is not None else ACCESS_TOKEN_EXPIRE_MINUTES
+    )
     payload: dict[str, Any] = {"sub": subject, "exp": expire, "type": token_type}
     if extra_claims:
         payload.update(extra_claims)
