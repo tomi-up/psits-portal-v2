@@ -8,7 +8,6 @@ import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
 import CheckEmailPage from '@/pages/CheckEmailPage'
 import ActivatePage from '@/pages/ActivatePage'
-import ActivationPage from '@/pages/ActivationPage'
 import DashboardPage from '@/pages/DashboardPage'
 import LandingPage from '@/pages/LandingPage'
 import StudentDashboardPage from '@/pages/StudentDashboardPage'
@@ -28,6 +27,7 @@ import AdminPaymentsPage from '@/pages/AdminPaymentsPage'
 import AdminNewsPage from '@/pages/AdminNewsPage'
 import AdminSanctionsPage from '@/pages/AdminSanctionsPage'
 import AdminInventoryPage from '@/pages/AdminInventoryPage'
+import AdminSecurityPage from '@/pages/AdminSecurityPage'
 import AdminHelpPage from '@/pages/AdminHelpPage'
 import QRScannerPage from '@/pages/QRScannerPage'
 import CheckpointScannerPage from '@/pages/CheckpointScannerPage'
@@ -61,9 +61,6 @@ export default function App() {
           <Route path="/legacy-dashboard" element={<DashboardPage />} />
         </Route>
 
-        {/* MVP Activation - public for testing */}
-        <Route path="/activate-new" element={<ActivationPage />} />
-
         {/* MVP Student Dashboard - passwordless auth, reads from localStorage */}
         <Route path="/dashboard" element={<StudentDashboardPage />} />
         <Route path="/events" element={<StudentEventsPage />} />
@@ -88,6 +85,7 @@ export default function App() {
           <Route path="/admin/news" element={<AdminNewsPage />} />
           <Route path="/admin/sanctions" element={<AdminSanctionsPage />} />
           <Route path="/admin/inventory" element={<AdminInventoryPage />} />
+          <Route path="/admin/security" element={<AdminSecurityPage />} />
           <Route path="/admin/help" element={<AdminHelpPage />} />
 
           {/* Legacy two-scan scanner - an admin must be logged in on this device */}

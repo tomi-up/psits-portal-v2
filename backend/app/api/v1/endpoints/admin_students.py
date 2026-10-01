@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.deps import get_current_admin
 from app.models.student import Student, StudentSchoolYear, SchoolYear, Program
-from app.models.user import Profile, AccountStatus
 from app.models.balance import MembershipFee
 
 router = APIRouter(prefix="/officer/students", tags=["admin-students"], dependencies=[Depends(get_current_admin)])
@@ -211,35 +210,4 @@ def update_student(student_id: str, request: StudentUpsertRequest, db: Session =
     db.refresh(student)
     db.refresh(ssy)
 
-    return _row_for(student, ssy)
-
-
-@router.post("/{student_id}/reset-authenticator", response_model=StudentRow)
-def reset_authenticator(student_id: str, db: Session = Depends(get_db)):
-    """Clear this student's TOTP enrollment and un-activate their account,
-    so they can go through /student-activate/enroll-mfa again from scratch -
-    for a lost/replaced device. Does not touch their roster/enrollment data."""
-    student = db.query(Student).filter(Student.id == student_id).first()
-    if not student:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
-
-    profile = db.query(Profile).filter(Profile.student_id == student.student_id).first()
-    if profile:
-        profile.totp_secret = None
-        # /student-activate/verify (step 1 of activation) gates re-activation
-        # on THIS field, not Student.is_active - miss it and the student is
-        # bounced with "Account already activated" even after totp_secret is
-        # cleared.
-        profile.status = AccountStatus.INACTIVE
-
-    student.is_active = False
-    db.commit()
-    db.refresh(student)
-
-    ssy = (
-        db.query(StudentSchoolYear)
-        .filter(StudentSchoolYear.student_id == student.id)
-        .order_by(StudentSchoolYear.enrolled_at.desc())
-        .first()
-    )
     return _row_for(student, ssy)

@@ -29,10 +29,11 @@ class Profile(BaseModel):
     email = Column(String(255), nullable=False, index=True)
     profile_image_url = Column(String(512), nullable=True)
     status = Column(SQLEnum(AccountStatus), default=AccountStatus.ACTIVE, index=True)
-    totp_secret = Column(TEXT, nullable=True)  # Fernet-encrypted TOTP secret
     # Google's stable per-account subject id ("sub" claim), bound to this
-    # student's Profile the first time they sign in with Google - replaces
-    # totp_secret as the auth factor when set.
+    # student's Profile the first time they sign in with Google - the only
+    # student auth factor now; the TOTP app this used to say instead is gone.
+    # The profiles.totp_secret DB column is left in place (unused, always
+    # NULL) rather than migrated away, since nothing here reads or writes it.
     google_sub = Column(String(255), unique=True, nullable=True)
 
     __table_args__ = (

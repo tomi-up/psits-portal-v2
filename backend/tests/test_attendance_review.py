@@ -183,7 +183,6 @@ class TestDashboardExposesReviewStatus:
         from datetime import datetime
 
         from app.models.user import Profile, AccountStatus
-        from app.core.crypto import encrypt_secret
         from app.core.security import create_access_token
 
         student = make_student(course="BSCS", year_level=1, section="A")
@@ -199,7 +198,6 @@ class TestDashboardExposesReviewStatus:
                 display_name=f"{student.first_name} {student.last_name}",
                 email=f"{student.student_id}@psits.local",
                 status=AccountStatus.ACTIVE,
-                totp_secret=encrypt_secret("JBSWY3DPEHPK3PXP"),
             )
         )
         db.commit()

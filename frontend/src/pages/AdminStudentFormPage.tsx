@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
-import { IdCard, User, Mail, Phone, ArrowLeft, RotateCcw } from 'lucide-react'
+import { IdCard, User, Mail, Phone, ArrowLeft } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
@@ -56,7 +56,6 @@ export default function AdminStudentFormPage() {
   const [form, setForm] = useState(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
-  const [resetting, setResetting] = useState(false)
   const [loading, setLoading] = useState(isEditing)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -162,33 +161,6 @@ export default function AdminStudentFormPage() {
       danger: true,
     })
     if (confirmed) navigate('/admin/students')
-  }
-
-  async function handleResetAuthenticator() {
-    if (!id) return
-    const confirmed = await confirmAction({
-      title: 'Reset authenticator?',
-      text: `${form.first_name} ${form.last_name} will need to activate their account again from scratch (scan a new QR code). Use this if they lost their device.`,
-      confirmText: 'Reset',
-      danger: true,
-    })
-    if (!confirmed) return
-
-    setResetting(true)
-    try {
-      const res = await adminFetch(`${API}/officer/students/${id}/reset-authenticator`, { method: 'POST' })
-      if (!res.ok) {
-        const err = await res.json()
-        notify.error('Reset failed', err.detail)
-        return
-      }
-      setForm((f) => ({ ...f, is_active: false }))
-      notify.success('Authenticator reset', 'This student can now re-activate their account.')
-    } catch {
-      notify.error('Network error', 'Could not reach the server.')
-    } finally {
-      setResetting(false)
-    }
   }
 
   function fieldClass(field: string) {
@@ -425,8 +397,8 @@ export default function AdminStudentFormPage() {
                   <div>
                     <p className="text-sm font-medium text-slate-900 dark:text-white">Portal Account Activated</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Whether this student has completed authenticator (TOTP) setup and can log in. New
-                      students always start unactivated - they activate it themselves.
+                      Whether this student has signed in with Google and can use the portal. New
+                      students always start unactivated - they activate it themselves on first sign-in.
                     </p>
                   </div>
                   <button
@@ -445,25 +417,6 @@ export default function AdminStudentFormPage() {
                     />
                   </button>
                 </div>
-
-                {isEditing && form.is_active && (
-                  <div className="flex items-center justify-between rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-amber-900 dark:text-amber-300">Lost device?</p>
-                      <p className="text-xs text-amber-700 dark:text-amber-400">
-                        Reset their authenticator so they can scan a new QR code and activate again.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleResetAuthenticator}
-                      disabled={resetting}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm font-semibold text-amber-700 dark:text-amber-400 transition hover:bg-amber-100 disabled:opacity-50"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      {resetting ? 'Resetting...' : 'Reset Authenticator'}
-                    </button>
-                  </div>
-                )}
 
                 <div className="flex justify-end gap-2">
                   <button

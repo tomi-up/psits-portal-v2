@@ -43,10 +43,10 @@ def _resolve_student(authorization: str | None, db: Session) -> Student | None:
         return None
 
     student = db.query(Student).filter(Student.id == payload["sub"]).first()
-    # is_active means "has completed MFA activation" (see student_auth.py) -
-    # re-checking it here means an admin's reset-authenticator action
-    # immediately revokes any outstanding session for that student, not just
-    # future logins.
+    # is_active means "has signed in with Google at least once" (see
+    # google_login in student_auth.py) - re-checking it here means toggling
+    # a student's Portal Account Activated flag off immediately revokes any
+    # outstanding session, not just future logins.
     if not student or not student.is_active:
         return None
 

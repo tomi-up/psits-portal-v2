@@ -27,9 +27,8 @@ export default function AuthLayout({
   children: ReactNode
   tagline?: string
   /** Keeps this one panel light regardless of the ambient theme, for pages
-   * whose own content isn't dark-mode aware (e.g. ActivationPage). Admin
-   * login itself is not forced light - it follows the same theme as the
-   * rest of the admin panel. */
+   * whose own content isn't dark-mode aware. Admin login itself is not
+   * forced light - it follows the same theme as the rest of the admin panel. */
   forceLight?: boolean
 }) {
   const lightDots = {
