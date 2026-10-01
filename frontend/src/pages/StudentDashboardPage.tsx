@@ -8,8 +8,9 @@ import StudentHeader from '@/components/StudentHeader'
 import QrCodeModal from '@/components/QrCodeModal'
 import RegistrationNotice from '@/components/RegistrationNotice'
 import EmptyState from '@/components/EmptyState'
+import LogoSpinner from '@/components/LogoSpinner'
 import { getStudentSidebarItems } from '@/lib/studentNav'
-import { studentFetch } from '@/lib/studentAuth'
+import { studentFetch, getStudentUser } from '@/lib/studentAuth'
 import { API } from '@/lib/apiBase'
 import { startStudentTourIfFirstVisit } from '@/lib/tour'
 
@@ -49,7 +50,7 @@ interface EventItem {
 
 export default function StudentDashboardPage() {
   const navigate = useNavigate()
-  const [studentId, setStudentId] = useState<string | null>(null)
+  const studentId = getStudentUser()?.student_id ?? null
   const [data, setData] = useState<DashboardData | null>(null)
   const [nextEvent, setNextEvent] = useState<EventItem | null>(null)
   const [loading, setLoading] = useState(true)
@@ -60,13 +61,8 @@ export default function StudentDashboardPage() {
   const [hasActiveSettlement, setHasActiveSettlement] = useState(false)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('user')
-    if (!stored) {
-      navigate('/login', { replace: true })
-      return
-    }
-    setStudentId(JSON.parse(stored).student_id)
-  }, [navigate])
+    if (!studentId) navigate('/login', { replace: true })
+  }, [studentId, navigate])
 
   useEffect(() => {
     if (!studentId) return
@@ -318,14 +314,6 @@ function StatCardSkeleton() {
     <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
       <div className="h-3 w-24 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
       <div className="mt-3 h-7 w-16 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-    </div>
-  )
-}
-
-function LogoSpinner() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 font-sans dark:bg-slate-950">
-      <img src="/psits-logo.png" alt="PSITS" className="h-16 w-16 animate-spin-slow" />
     </div>
   )
 }

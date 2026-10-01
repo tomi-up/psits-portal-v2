@@ -5,8 +5,9 @@ import { notify } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
 import Sidebar from '@/components/Sidebar'
 import StudentHeader from '@/components/StudentHeader'
+import LogoSpinner from '@/components/LogoSpinner'
 import { getStudentSidebarItems } from '@/lib/studentNav'
-import { studentFetch } from '@/lib/studentAuth'
+import { studentFetch, getStudentUser } from '@/lib/studentAuth'
 import { API } from '@/lib/apiBase'
 import { startSanctionsTour, startSanctionsTourIfFirstVisit } from '@/lib/tour'
 
@@ -46,9 +47,10 @@ interface SanctionsData {
 
 export default function StudentSanctionsPage() {
   const navigate = useNavigate()
-  const [studentId, setStudentId] = useState<string | null>(null)
-  const [studentName, setStudentName] = useState<string | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const studentUser = getStudentUser()
+  const studentId = studentUser?.student_id ?? null
+  const studentName = studentUser?.name ?? null
+  const avatarUrl = studentUser?.avatar_url ?? null
   const [data, setData] = useState<SanctionsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -58,16 +60,8 @@ export default function StudentSanctionsPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('user')
-    if (!stored) {
-      navigate('/login', { replace: true })
-      return
-    }
-    const user = JSON.parse(stored)
-    setStudentId(user.student_id)
-    setStudentName(user.name ?? null)
-    setAvatarUrl(user.avatar_url ?? null)
-  }, [navigate])
+    if (!studentId) navigate('/login', { replace: true })
+  }, [studentId, navigate])
 
   useEffect(() => {
     if (!studentId) return
@@ -148,7 +142,7 @@ export default function StudentSanctionsPage() {
     navigate('/login', { replace: true })
   }
 
-  if (!studentId) return null
+  if (!studentId) return <LogoSpinner />
 
   const hasActivePending = data?.active_settlement && data.active_settlement.status === 'PENDING'
 

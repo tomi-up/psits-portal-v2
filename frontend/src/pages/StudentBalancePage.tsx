@@ -6,8 +6,9 @@ import { confirmAction } from '@/lib/confirm'
 import Sidebar from '@/components/Sidebar'
 import StudentHeader from '@/components/StudentHeader'
 import EmptyState from '@/components/EmptyState'
+import LogoSpinner from '@/components/LogoSpinner'
 import { getStudentSidebarItems } from '@/lib/studentNav'
-import { studentFetch } from '@/lib/studentAuth'
+import { studentFetch, getStudentUser } from '@/lib/studentAuth'
 import { API } from '@/lib/apiBase'
 
 interface PaymentItem {
@@ -40,9 +41,10 @@ function peso(amount: number) {
 
 export default function StudentBalancePage() {
   const navigate = useNavigate()
-  const [studentId, setStudentId] = useState<string | null>(null)
-  const [studentName, setStudentName] = useState<string | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const studentUser = getStudentUser()
+  const studentId = studentUser?.student_id ?? null
+  const studentName = studentUser?.name ?? null
+  const avatarUrl = studentUser?.avatar_url ?? null
   const [totalBalance, setTotalBalance] = useState(0)
   const [fees, setFees] = useState<FeeItem[]>([])
   const [termFilter, setTermFilter] = useState('ALL')
@@ -57,16 +59,8 @@ export default function StudentBalancePage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('user')
-    if (!stored) {
-      navigate('/login', { replace: true })
-      return
-    }
-    const user = JSON.parse(stored)
-    setStudentId(user.student_id)
-    setStudentName(user.name ?? null)
-    setAvatarUrl(user.avatar_url ?? null)
-  }, [navigate])
+    if (!studentId) navigate('/login', { replace: true })
+  }, [studentId, navigate])
 
   useEffect(() => {
     if (!studentId) return
@@ -160,7 +154,7 @@ export default function StudentBalancePage() {
     navigate('/login', { replace: true })
   }
 
-  if (!studentId) return null
+  if (!studentId) return <LogoSpinner />
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans dark:bg-slate-950">

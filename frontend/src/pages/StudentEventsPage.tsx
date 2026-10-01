@@ -22,7 +22,8 @@ import StudentHeader from '@/components/StudentHeader'
 import QrCodeModal from '@/components/QrCodeModal'
 import { getStudentSidebarItems } from '@/lib/studentNav'
 import EmptyState from '@/components/EmptyState'
-import { studentFetch } from '@/lib/studentAuth'
+import LogoSpinner from '@/components/LogoSpinner'
+import { studentFetch, getStudentUser } from '@/lib/studentAuth'
 import { API } from '@/lib/apiBase'
 import { startEventsTour, startEventsTourIfFirstVisit } from '@/lib/tour'
 
@@ -47,9 +48,10 @@ type StatusFilter = 'ALL' | 'NOT_REGISTERED' | 'REGISTERED' | 'CHECKED_IN' | 'PR
 
 export default function StudentEventsPage() {
   const navigate = useNavigate()
-  const [studentId, setStudentId] = useState<string | null>(null)
-  const [studentName, setStudentName] = useState<string | null>(null)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const studentUser = getStudentUser()
+  const studentId = studentUser?.student_id ?? null
+  const studentName = studentUser?.name ?? null
+  const avatarUrl = studentUser?.avatar_url ?? null
   const [events, setEvents] = useState<EventItem[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -69,16 +71,8 @@ export default function StudentEventsPage() {
   const [sortAsc, setSortAsc] = useState(true)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('user')
-    if (!stored) {
-      navigate('/login', { replace: true })
-      return
-    }
-    const user = JSON.parse(stored)
-    setStudentId(user.student_id)
-    setStudentName(user.name ?? null)
-    setAvatarUrl(user.avatar_url ?? null)
-  }, [navigate])
+    if (!studentId) navigate('/login', { replace: true })
+  }, [studentId, navigate])
 
   useEffect(() => {
     if (!studentId) return
@@ -222,7 +216,7 @@ export default function StudentEventsPage() {
     }
   }
 
-  if (!studentId) return null
+  if (!studentId) return <LogoSpinner />
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans dark:bg-slate-950">
