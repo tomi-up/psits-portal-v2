@@ -91,6 +91,117 @@ class TestCreateBalance:
         assert res.status_code in (401, 403)
 
 
+class TestUpdateBalance:
+    def _create(self, client, admin_headers, student, school_setup, amount_due=150):
+        res = client.post(
+            "/api/v1/officer/balances/",
+            headers=admin_headers,
+            json={
+                "student_id": student.student_id,
+                "school_year_id": school_setup["year"].id,
+                "semester": "1ST",
+                "amount_due": amount_due,
+            },
+        )
+        assert res.status_code == 200, res.text
+        return res.json()["fee_id"]
+
+    def test_admin_can_edit_amount_due(self, client, db, admin_headers, make_student, school_setup):
+        student = make_student()
+        fee_id = self._create(client, admin_headers, student, school_setup)
+
+        res = client.put(
+            f"/api/v1/officer/balances/{fee_id}",
+            headers=admin_headers,
+            json={"amount_due": 200},
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["amount_due"] == 200
+        assert body["balance"] == 200
+
+        fee = db.query(MembershipFee).filter(MembershipFee.id == fee_id).one()
+        assert float(fee.amount_due) == 200
+
+    def test_rejects_negative_amount(self, client, admin_headers, make_student, school_setup):
+        student = make_student()
+        fee_id = self._create(client, admin_headers, student, school_setup)
+
+        res = client.put(
+            f"/api/v1/officer/balances/{fee_id}",
+            headers=admin_headers,
+            json={"amount_due": -10},
+        )
+        assert res.status_code == 422
+
+    def test_rejects_unknown_fee(self, client, admin_headers):
+        res = client.put(
+            "/api/v1/officer/balances/no-such-fee",
+            headers=admin_headers,
+            json={"amount_due": 100},
+        )
+        assert res.status_code == 404
+
+    def test_requires_admin(self, client, make_student, school_setup, admin_headers):
+        student = make_student()
+        fee_id = self._create(client, admin_headers, student, school_setup)
+
+        res = client.put(f"/api/v1/officer/balances/{fee_id}", json={"amount_due": 100})
+        assert res.status_code in (401, 403)
+
+
+class TestDeleteBalance:
+    def _create(self, client, admin_headers, student, school_setup, amount_due=150):
+        res = client.post(
+            "/api/v1/officer/balances/",
+            headers=admin_headers,
+            json={
+                "student_id": student.student_id,
+                "school_year_id": school_setup["year"].id,
+                "semester": "1ST",
+                "amount_due": amount_due,
+            },
+        )
+        assert res.status_code == 200, res.text
+        return res.json()["fee_id"]
+
+    def test_admin_can_delete_an_unpaid_balance(self, client, db, admin_headers, make_student, school_setup):
+        student = make_student()
+        fee_id = self._create(client, admin_headers, student, school_setup)
+
+        res = client.delete(f"/api/v1/officer/balances/{fee_id}", headers=admin_headers)
+        assert res.status_code == 200, res.text
+
+        assert db.query(MembershipFee).filter(MembershipFee.id == fee_id).first() is None
+
+    def test_refuses_to_delete_a_fee_with_payment_history(
+        self, client, admin_headers, make_student, school_setup
+    ):
+        student = make_student()
+        fee_id = self._create(client, admin_headers, student, school_setup)
+
+        paid = client.post(
+            f"/api/v1/officer/balances/{fee_id}/record-payment",
+            headers=admin_headers,
+            json={"amount": 50},
+        )
+        assert paid.status_code == 200, paid.text
+
+        res = client.delete(f"/api/v1/officer/balances/{fee_id}", headers=admin_headers)
+        assert res.status_code == 409
+
+    def test_rejects_unknown_fee(self, client, admin_headers):
+        res = client.delete("/api/v1/officer/balances/no-such-fee", headers=admin_headers)
+        assert res.status_code == 404
+
+    def test_requires_admin(self, client, make_student, school_setup, admin_headers):
+        student = make_student()
+        fee_id = self._create(client, admin_headers, student, school_setup)
+
+        res = client.delete(f"/api/v1/officer/balances/{fee_id}")
+        assert res.status_code in (401, 403)
+
+
 class TestListSchoolYears:
     def test_lists_school_years_for_the_dropdown(self, client, admin_headers, school_setup):
         res = client.get("/api/v1/officer/school-years", headers=admin_headers)

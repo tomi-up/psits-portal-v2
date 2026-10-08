@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, X, QrCode, Search, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { Check, X, QrCode, Search, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
 import { notify } from '@/lib/toast'
 import { confirmAction, confirmActionWithReason } from '@/lib/confirm'
 import Sidebar, { MobileMenuButton } from '@/components/Sidebar'
@@ -87,6 +87,11 @@ export default function AdminPaymentsPage() {
   const [recordAmount, setRecordAmount] = useState('')
   const [recordNote, setRecordNote] = useState('')
   const [recording, setRecording] = useState(false)
+
+  const [editFor, setEditFor] = useState<BalanceRow | null>(null)
+  const [editAmount, setEditAmount] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [deletingFeeId, setDeletingFeeId] = useState<string | null>(null)
 
   const [addBalanceOpen, setAddBalanceOpen] = useState(false)
   const [studentOptions, setStudentOptions] = useState<StudentOption[]>([])
@@ -315,6 +320,67 @@ export default function AdminPaymentsPage() {
       notify.error('Network error', 'Could not reach the server.')
     } finally {
       setRecording(false)
+    }
+  }
+
+  function openEditForm(row: BalanceRow) {
+    setEditFor(row)
+    setEditAmount(String(row.amount_due))
+  }
+
+  async function handleEditBalance() {
+    if (!editFor) return
+    const amountNum = Number(editAmount)
+    if (!amountNum || amountNum < 0) {
+      notify.error('Invalid amount', 'Please enter a valid amount due.')
+      return
+    }
+
+    setEditing(true)
+    try {
+      const res = await adminFetch(`${API}/officer/balances/${editFor.fee_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_due: amountNum }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        notify.error('Could not update balance', err.detail || 'Please try again.')
+        return
+      }
+      notify.success('Updated', `${editFor.student_name}'s amount due is now ${peso(amountNum)}.`)
+      setEditFor(null)
+      await loadBalances()
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setEditing(false)
+    }
+  }
+
+  async function handleDeleteBalance(row: BalanceRow) {
+    const confirmed = await confirmAction({
+      title: `Delete this balance?`,
+      text: `${row.student_name}'s ${semesterLabel(row.semester)} ${row.school_year} fee (${peso(row.amount_due)}) will be permanently removed.`,
+      confirmText: 'Delete',
+      danger: true,
+    })
+    if (!confirmed) return
+
+    setDeletingFeeId(row.fee_id)
+    try {
+      const res = await adminFetch(`${API}/officer/balances/${row.fee_id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        notify.error('Could not delete balance', err.detail || 'Please try again.')
+        return
+      }
+      notify.success('Deleted', `${row.student_name}'s balance was removed.`)
+      await loadBalances()
+    } catch {
+      notify.error('Network error', 'Could not reach the server.')
+    } finally {
+      setDeletingFeeId(null)
     }
   }
 
@@ -947,6 +1013,21 @@ export default function AdminPaymentsPage() {
                             >
                               <Plus className="h-3.5 w-3.5" />
                             </button>
+                            <button
+                              onClick={() => openEditForm(row)}
+                              title="Edit amount due"
+                              className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 text-slate-500 dark:text-slate-400 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBalance(row)}
+                              disabled={deletingFeeId === row.fee_id}
+                              title="Delete balance"
+                              className="rounded-lg border border-slate-200 dark:border-slate-700 p-1.5 text-rose-500 dark:text-rose-400 transition hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1038,6 +1119,51 @@ export default function AdminPaymentsPage() {
 
             <button
               onClick={() => setRecordFor(null)}
+              className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setEditFor(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Edit Balance</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {editFor.student_name} · {semesterLabel(editFor.semester)} {editFor.school_year}
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Amount Due</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+              </div>
+              <button
+                onClick={handleEditBalance}
+                disabled={editing}
+                className="w-full rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+              >
+                {editing ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setEditFor(null)}
               className="mt-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               Cancel

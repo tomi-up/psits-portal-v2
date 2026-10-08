@@ -76,6 +76,10 @@ class CreateBalanceBody(BaseModel):
     amount_due: float = 100.0
 
 
+class UpdateBalanceBody(BaseModel):
+    amount_due: float
+
+
 class SchoolYearOption(BaseModel):
     id: str
     label: str
@@ -337,6 +341,71 @@ def create_balance(
         balance=float(fee.amount_due),
         status=_fee_status(float(fee.amount_due), 0.0),
     )
+
+
+@router.put("/balances/{fee_id}")
+def update_balance(
+    fee_id: str,
+    body: UpdateBalanceBody,
+    db: Session = Depends(get_db),
+    admin: AdminAccount = Depends(get_current_admin),
+):
+    """Correct the assessed amount on an existing fee. amount_paid is
+    untouched - use record-payment for that - so this never rewrites
+    payment history, only what was owed."""
+
+    if body.amount_due < 0:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Amount due cannot be negative")
+
+    fee = (
+        db.query(MembershipFee)
+        .options(joinedload(MembershipFee.student), joinedload(MembershipFee.school_year))
+        .filter(MembershipFee.id == fee_id)
+        .first()
+    )
+    if not fee:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
+
+    fee.amount_due = Decimal(str(body.amount_due))
+    db.commit()
+
+    return BalanceRow(
+        fee_id=fee.id,
+        student_id=fee.student.student_id,
+        student_name=f"{fee.student.first_name} {fee.student.last_name}",
+        school_year=fee.school_year.label,
+        semester=fee.semester,
+        amount_due=float(fee.amount_due),
+        amount_paid=float(fee.amount_paid),
+        balance=float(fee.amount_due) - float(fee.amount_paid),
+        status=_fee_status(float(fee.amount_due), float(fee.amount_paid)),
+    )
+
+
+@router.delete("/balances/{fee_id}")
+def delete_balance(
+    fee_id: str, db: Session = Depends(get_db), admin: AdminAccount = Depends(get_current_admin)
+):
+    """Remove a fee row entirely - e.g. one created by mistake. Refuses to
+    delete a fee that already has payment history, since that cascades to
+    the Payment rows too (see MembershipFee.payments) and would silently
+    erase a paid-in-person or approved-submission record."""
+
+    fee = db.query(MembershipFee).filter(MembershipFee.id == fee_id).first()
+    if not fee:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
+
+    payment_count = db.query(Payment).filter(Payment.membership_fee_id == fee.id).count()
+    if payment_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Can't delete - this fee has {payment_count} payment(s) on record",
+        )
+
+    db.delete(fee)
+    db.commit()
+
+    return {"status": "DELETED"}
 
 
 @router.post("/balances/{fee_id}/record-payment")
