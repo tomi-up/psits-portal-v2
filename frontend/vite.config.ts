@@ -14,7 +14,10 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     host: true,
-    allowedHosts: true, // lets ngrok's (or any) tunnel domain through - dev only
+    // Only ngrok tunnel domains, not `true` (which disables Vite's DNS-rebinding
+    // protection entirely). LAN IPs and localhost are always allowed by Vite,
+    // so phone testing over Wi-Fi is unaffected.
+    allowedHosts: ['.ngrok-free.app', '.ngrok.app', '.ngrok.io'],
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
