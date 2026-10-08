@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import CookieConsentBanner from '@/components/CookieConsentBanner'
+import ServerWakingBanner from '@/components/ServerWakingBanner'
 import RequireAdmin from '@/components/RequireAdmin'
 import LoginPage from '@/pages/LoginPage'
 import LandingPage from '@/pages/LandingPage'
@@ -33,6 +34,7 @@ export default function App() {
     <Router>
       <Toaster position="top-right" gutter={12} toastOptions={{ duration: 4000 }} />
       <CookieConsentBanner />
+      <ServerWakingBanner />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 

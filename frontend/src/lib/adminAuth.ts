@@ -1,3 +1,5 @@
+import { trackPossibleWakeUp } from '@/lib/serverWakeStore'
+
 const TOKEN_KEY = 'admin_token'
 const ADMIN_KEY = 'admin_user'
 
@@ -36,7 +38,7 @@ export async function adminFetch(input: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers)
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
-  const res = await fetch(input, { ...init, headers })
+  const res = await trackPossibleWakeUp(fetch(input, { ...init, headers }))
 
   if (res.status === 401) {
     clearAdminSession()

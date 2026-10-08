@@ -1,3 +1,5 @@
+import { trackPossibleWakeUp } from '@/lib/serverWakeStore'
+
 const TOKEN_KEY = 'access_token'
 const USER_KEY = 'user'
 
@@ -38,7 +40,7 @@ export async function studentFetch(input: string, init: RequestInit = {}): Promi
   const headers = new Headers(init.headers)
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
-  const res = await fetch(input, { ...init, headers })
+  const res = await trackPossibleWakeUp(fetch(input, { ...init, headers }))
 
   if (res.status === 401) {
     sessionStorage.removeItem('access_token')
