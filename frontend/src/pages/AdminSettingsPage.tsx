@@ -22,6 +22,7 @@ export default function AdminSettingsPage() {
   const [manualKey, setManualKey] = useState('')
   const [setupToken, setSetupToken] = useState('')
   const [confirmCode, setConfirmCode] = useState('')
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('')
   const [confirming, setConfirming] = useState(false)
 
   // Reset
@@ -82,20 +83,21 @@ export default function AdminSettingsPage() {
     setManualKey('')
     setSetupToken('')
     setConfirmCode('')
+    setConfirmPasswordInput('')
   }
 
   async function confirmEnrollment() {
-    if (confirmCode.length !== 6) return
+    if (confirmCode.length !== 6 || !confirmPasswordInput) return
     setConfirming(true)
     try {
       const res = await adminFetch(`${API}/admin/auth/mfa/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ setup_token: setupToken, totp_code: confirmCode }),
+        body: JSON.stringify({ setup_token: setupToken, totp_code: confirmCode, password: confirmPasswordInput }),
       })
       const data = await res.json()
       if (!res.ok) {
-        notify.error('Incorrect code', data.detail || 'Check your authenticator app and try again.')
+        notify.error('Could not enable 2FA', data.detail || 'Check your password and authenticator code.')
         setConfirmCode('')
         return
       }
@@ -267,10 +269,24 @@ export default function AdminSettingsPage() {
                   <OtpInput value={confirmCode} onChange={setConfirmCode} />
                 </div>
 
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Your password
+                  </label>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={confirmPasswordInput}
+                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                    placeholder="Confirm it's you before this replaces your current 2FA"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white transition focus:border-sky-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+
                 <div className="mt-4 flex gap-2">
                   <button
                     onClick={confirmEnrollment}
-                    disabled={confirming || confirmCode.length !== 6}
+                    disabled={confirming || confirmCode.length !== 6 || !confirmPasswordInput}
                     className="flex-1 rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
                   >
                     {confirming ? 'Confirming...' : 'Confirm & Enable'}

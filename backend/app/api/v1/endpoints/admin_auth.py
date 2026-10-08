@@ -70,6 +70,7 @@ class AdminMFAEnrollResponse(BaseModel):
 class AdminMFAConfirmRequest(BaseModel):
     setup_token: str
     totp_code: str
+    password: str
 
 
 class AdminMFAStatusResponse(BaseModel):
@@ -110,6 +111,7 @@ def admin_login(request: Request, body: AdminLoginRequest, db: Session = Depends
         # outright, so it's useless for anything except /login/verify-mfa.
         pending_token = create_access_token(
             subject=admin.id, token_type="admin_mfa_pending", expires_minutes=MFA_PENDING_TOKEN_MINUTES,
+            extra_claims={"sec": admin.security_stamp},
         )
         return AdminMFARequiredResponse(
             pending_token=pending_token, expires_in_seconds=MFA_PENDING_TOKEN_MINUTES * 60,
@@ -133,6 +135,15 @@ def admin_login_verify_mfa(request: Request, body: AdminMFAVerifyRequest, db: Se
     admin = db.query(AdminAccount).filter(AdminAccount.id == payload["sub"]).first()
     if not admin or not admin.is_active or not admin.mfa_enabled or not admin.totp_secret:
         raise UnauthorizedException("Invalid login session")
+
+    # The pending token was minted with the security stamp that was current
+    # at the time /login succeeded. If the password (or an MFA reset) has
+    # since rotated the stamp, this pending token is for a login attempt
+    # that's no longer valid - without this check, a pending token captured
+    # before a password change would still complete login afterward, up to
+    # its own 10-minute expiry.
+    if payload.get("sec") != admin.security_stamp:
+        raise UnauthorizedException("Login session expired. Please sign in again.")
 
     secret = decrypt_secret(admin.totp_secret)
     if not pyotp.TOTP(secret).verify(body.totp_code, valid_window=1):
@@ -184,6 +195,16 @@ def admin_mfa_confirm(
     request: Request, body: AdminMFAConfirmRequest, admin: AdminAccount = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    # Require the current password here too, not just a valid session -
+    # enroll+confirm together can otherwise replace an already-enabled
+    # account's second factor using nothing but a bearer token, which is
+    # worse than merely bypassing 2FA: a stolen session would let an
+    # attacker lock the real owner out of their own authenticator. This
+    # mirrors mfa_reset, which already requires the password for the same
+    # reason.
+    if not verify_password(body.password, admin.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect password")
+
     try:
         setup_data = decrypt_mfa_setup(body.setup_token, max_age_seconds=900)
     except Exception:

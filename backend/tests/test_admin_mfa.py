@@ -17,7 +17,7 @@ class TestEnrollAndConfirm:
         confirm = client.post(
             "/api/v1/admin/auth/mfa/confirm",
             headers=admin_headers,
-            json={"setup_token": body["setup_token"], "totp_code": code},
+            json={"setup_token": body["setup_token"], "totp_code": code, "password": "adminpass123"},
         )
         assert confirm.status_code == 200, confirm.text
         assert confirm.json()["status"] == "ENABLED"
@@ -33,13 +33,31 @@ class TestEnrollAndConfirm:
         confirm = client.post(
             "/api/v1/admin/auth/mfa/confirm",
             headers=admin_headers,
-            json={"setup_token": setup_token, "totp_code": "000000"},
+            json={"setup_token": setup_token, "totp_code": "000000", "password": "adminpass123"},
         )
         assert confirm.status_code == 400
 
     def test_enroll_requires_admin(self, client):
         res = client.post("/api/v1/admin/auth/mfa/enroll")
         assert res.status_code in (401, 403)
+
+    def test_confirm_rejects_wrong_password(self, client, db, admin_headers):
+        """A stolen bearer token alone can't finalize new MFA - the current
+        password is required too, so a hijacked session can't silently
+        replace the real owner's authenticator."""
+        enroll = client.post("/api/v1/admin/auth/mfa/enroll", headers=admin_headers)
+        body = enroll.json()
+        code = pyotp.TOTP(body["manual_entry_key"]).now()
+
+        confirm = client.post(
+            "/api/v1/admin/auth/mfa/confirm",
+            headers=admin_headers,
+            json={"setup_token": body["setup_token"], "totp_code": code, "password": "wrong-password"},
+        )
+        assert confirm.status_code == 400
+
+        admin = db.query(AdminAccount).filter(AdminAccount.email == "admin@psits-test.org").one()
+        assert admin.mfa_enabled is False
 
 
 class TestLoginWithMfa:
@@ -51,7 +69,7 @@ class TestLoginWithMfa:
         client.post(
             "/api/v1/admin/auth/mfa/confirm",
             headers=admin_headers,
-            json={"setup_token": body["setup_token"], "totp_code": code},
+            json={"setup_token": body["setup_token"], "totp_code": code, "password": "adminpass123"},
         )
         return secret
 
@@ -119,6 +137,32 @@ class TestLoginWithMfa:
         )
         assert verify.status_code == 401
 
+    def test_pending_token_rejected_after_password_change(self, client, admin_headers):
+        """A pending MFA token captured before a password change must not
+        still complete login afterward - it carries the security stamp that
+        was current at /login time, and that stamp rotates on every
+        password change."""
+        secret = self._enroll_mfa(client, admin_headers)
+
+        login = client.post(
+            "/api/v1/admin/auth/login",
+            json={"email": "admin@psits-test.org", "password": "adminpass123"},
+        )
+        pending_token = login.json()["pending_token"]
+
+        changed = client.post(
+            "/api/v1/admin/auth/change-password",
+            headers=admin_headers,
+            json={"current_password": "adminpass123", "new_password": "NewPass123!"},
+        )
+        assert changed.status_code == 200, changed.text
+
+        verify = client.post(
+            "/api/v1/admin/auth/login/verify-mfa",
+            json={"pending_token": pending_token, "totp_code": pyotp.TOTP(secret).now()},
+        )
+        assert verify.status_code == 401
+
     def test_login_without_mfa_enrolled_is_unchanged(self, client, admin_headers):
         res = client.post(
             "/api/v1/admin/auth/login",
@@ -138,7 +182,7 @@ class TestResetMfa:
         client.post(
             "/api/v1/admin/auth/mfa/confirm",
             headers=admin_headers,
-            json={"setup_token": body["setup_token"], "totp_code": code},
+            json={"setup_token": body["setup_token"], "totp_code": code, "password": "adminpass123"},
         )
 
         reset = client.post(
