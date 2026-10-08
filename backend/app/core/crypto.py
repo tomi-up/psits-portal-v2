@@ -9,11 +9,13 @@ from app.core.config import settings
 _fernet = Fernet(settings.mfa_encryption_key.encode())
 
 
-def encrypt_mfa_setup(subject_id: str, secret: str) -> str:
+def encrypt_mfa_setup(subject_id: str, secret: str, stamp: str) -> str:
     """Package a freshly-generated TOTP secret into a self-verifying, time-limited
     setup token so the server doesn't need to hold enrollment state between the
-    enroll and confirm requests of a two-step TOTP enrollment."""
-    payload = json.dumps({"subject_id": subject_id, "secret": secret}).encode()
+    enroll and confirm requests of a two-step TOTP enrollment. `stamp` binds it
+    to the account's security stamp at enroll time, so it stops working as soon
+    as any MFA or password change rotates that stamp."""
+    payload = json.dumps({"subject_id": subject_id, "secret": secret, "stamp": stamp}).encode()
     return _fernet.encrypt(payload).decode()
 
 

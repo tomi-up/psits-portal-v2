@@ -101,6 +101,9 @@ export default function AdminSettingsPage() {
         setConfirmCode('')
         return
       }
+      // The server rotated this account's session stamp - swap in the new
+      // token before loadStatus(), or the old one 401s and logs us out.
+      if (data.access_token && admin) setAdminSession(data.access_token, admin)
       notify.success('2FA enabled', 'You will need a code from your authenticator app to sign in from now on.')
       cancelEnrollment()
       await loadStatus()
@@ -125,6 +128,7 @@ export default function AdminSettingsPage() {
         notify.error('Could not turn off 2FA', data.detail || 'Incorrect password.')
         return
       }
+      if (data.access_token && admin) setAdminSession(data.access_token, admin)
       notify.success('2FA turned off', 'This account no longer requires a code to sign in.')
       setResetOpen(false)
       setResetPassword('')

@@ -76,6 +76,7 @@ class AdminMFAConfirmRequest(BaseModel):
 class AdminMFAStatusResponse(BaseModel):
     status: str
     message: str
+    access_token: str
 
 
 class AdminChangePasswordResponse(BaseModel):
@@ -182,7 +183,7 @@ def admin_mfa_enroll(request: Request, admin: AdminAccount = Depends(get_current
     img.save(buf, format="PNG")
     qr_code_image = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
-    setup_token = encrypt_mfa_setup(admin.id, secret)
+    setup_token = encrypt_mfa_setup(admin.id, secret, admin.security_stamp)
 
     return AdminMFAEnrollResponse(
         qr_code_image=qr_code_image, manual_entry_key=secret, setup_token=setup_token,
@@ -216,6 +217,15 @@ def admin_mfa_confirm(
     if setup_data["subject_id"] != admin.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Setup session does not match this account")
 
+    # Single-use: confirming (or resetting, or changing the password)
+    # rotates the stamp, so a setup token can't be replayed later to
+    # re-enable an authenticator the owner already replaced or turned off.
+    if setup_data.get("stamp") != admin.security_stamp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Setup session expired or invalid. Please restart enrollment.",
+        )
+
     secret = setup_data["secret"]
     if not pyotp.TOTP(secret).verify(body.totp_code, valid_window=1):
         # 400, not 401: the admin's own session/token is perfectly valid here -
@@ -230,9 +240,16 @@ def admin_mfa_confirm(
 
     admin.totp_secret = encrypt_secret(secret)
     admin.mfa_enabled = True
+    # Rotating also signs out every other session, which is what you want
+    # after a 2FA change. This session gets a fresh token below.
+    admin.security_stamp = str(uuid.uuid4())
     db.commit()
 
-    return AdminMFAStatusResponse(status="ENABLED", message="Two-factor authentication is now required for this account.")
+    return AdminMFAStatusResponse(
+        status="ENABLED",
+        message="Two-factor authentication is now required for this account.",
+        access_token=create_access_token(subject=admin.id, extra_claims={"sec": admin.security_stamp}),
+    )
 
 
 @router.post("/mfa/reset", response_model=AdminMFAStatusResponse)
@@ -257,9 +274,14 @@ def admin_mfa_reset(
 
     admin.totp_secret = None
     admin.mfa_enabled = False
+    admin.security_stamp = str(uuid.uuid4())
     db.commit()
 
-    return AdminMFAStatusResponse(status="DISABLED", message="Two-factor authentication has been turned off.")
+    return AdminMFAStatusResponse(
+        status="DISABLED",
+        message="Two-factor authentication has been turned off.",
+        access_token=create_access_token(subject=admin.id, extra_claims={"sec": admin.security_stamp}),
+    )
 
 
 @router.post("/change-password", response_model=AdminChangePasswordResponse)

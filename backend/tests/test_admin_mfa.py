@@ -66,12 +66,14 @@ class TestLoginWithMfa:
         body = enroll.json()
         secret = body["manual_entry_key"]
         code = pyotp.TOTP(secret).now()
-        client.post(
+        confirm = client.post(
             "/api/v1/admin/auth/mfa/confirm",
             headers=admin_headers,
             json={"setup_token": body["setup_token"], "totp_code": code, "password": "adminpass123"},
         )
-        return secret
+        assert confirm.status_code == 200, confirm.text
+        # Enabling MFA rotates the session stamp; the old headers are now dead.
+        return secret, {"Authorization": f"Bearer {confirm.json()['access_token']}"}
 
     def test_login_requires_mfa_code_once_enabled(self, client, admin_headers):
         self._enroll_mfa(client, admin_headers)
@@ -101,7 +103,7 @@ class TestLoginWithMfa:
         assert res.status_code == 401
 
     def test_verify_mfa_completes_login(self, client, admin_headers):
-        secret = self._enroll_mfa(client, admin_headers)
+        secret, _ = self._enroll_mfa(client, admin_headers)
 
         login = client.post(
             "/api/v1/admin/auth/login",
@@ -142,7 +144,7 @@ class TestLoginWithMfa:
         still complete login afterward - it carries the security stamp that
         was current at /login time, and that stamp rotates on every
         password change."""
-        secret = self._enroll_mfa(client, admin_headers)
+        secret, headers = self._enroll_mfa(client, admin_headers)
 
         login = client.post(
             "/api/v1/admin/auth/login",
@@ -152,7 +154,7 @@ class TestLoginWithMfa:
 
         changed = client.post(
             "/api/v1/admin/auth/change-password",
-            headers=admin_headers,
+            headers=headers,
             json={"current_password": "adminpass123", "new_password": "NewPass123!"},
         )
         assert changed.status_code == 200, changed.text
@@ -179,14 +181,15 @@ class TestResetMfa:
         enroll = client.post("/api/v1/admin/auth/mfa/enroll", headers=admin_headers)
         body = enroll.json()
         code = pyotp.TOTP(body["manual_entry_key"]).now()
-        client.post(
+        confirm = client.post(
             "/api/v1/admin/auth/mfa/confirm",
             headers=admin_headers,
             json={"setup_token": body["setup_token"], "totp_code": code, "password": "adminpass123"},
         )
+        headers = {"Authorization": f"Bearer {confirm.json()['access_token']}"}
 
         reset = client.post(
-            "/api/v1/admin/auth/mfa/reset", headers=admin_headers, json={"password": "adminpass123"},
+            "/api/v1/admin/auth/mfa/reset", headers=headers, json={"password": "adminpass123"},
         )
         assert reset.status_code == 200, reset.text
         assert reset.json()["status"] == "DISABLED"
@@ -201,6 +204,38 @@ class TestResetMfa:
             json={"email": "admin@psits-test.org", "password": "adminpass123"},
         )
         assert "access_token" in login.json()
+
+    def test_setup_token_cannot_be_replayed_after_reset(self, client, db, admin_headers):
+        enroll = client.post("/api/v1/admin/auth/mfa/enroll", headers=admin_headers).json()
+        body = {
+            "setup_token": enroll["setup_token"],
+            "totp_code": pyotp.TOTP(enroll["manual_entry_key"]).now(),
+            "password": "adminpass123",
+        }
+        confirm = client.post("/api/v1/admin/auth/mfa/confirm", headers=admin_headers, json=body)
+        headers = {"Authorization": f"Bearer {confirm.json()['access_token']}"}
+
+        reset = client.post("/api/v1/admin/auth/mfa/reset", headers=headers, json={"password": "adminpass123"})
+        headers = {"Authorization": f"Bearer {reset.json()['access_token']}"}
+
+        replay = client.post("/api/v1/admin/auth/mfa/confirm", headers=headers, json=body)
+        assert replay.status_code == 400
+
+        admin = db.query(AdminAccount).filter(AdminAccount.email == "admin@psits-test.org").one()
+        assert admin.mfa_enabled is False
+
+    def test_enabling_mfa_signs_out_other_sessions(self, client, admin_headers):
+        enroll = client.post("/api/v1/admin/auth/mfa/enroll", headers=admin_headers).json()
+        client.post(
+            "/api/v1/admin/auth/mfa/confirm",
+            headers=admin_headers,
+            json={
+                "setup_token": enroll["setup_token"],
+                "totp_code": pyotp.TOTP(enroll["manual_entry_key"]).now(),
+                "password": "adminpass123",
+            },
+        )
+        assert client.get("/api/v1/admin/auth/me", headers=admin_headers).status_code == 401
 
     def test_reset_rejects_wrong_password(self, client, admin_headers):
         res = client.post(
