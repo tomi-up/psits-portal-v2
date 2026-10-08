@@ -6,8 +6,14 @@ authors = ["PSITS Development Team"]
 packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-fastapi = "^0.115.0"
+python = "^3.10"
+fastapi = "^0.139.2"
+# Pinned directly (not just pulled in transitively by fastapi) because
+# fastapi's own starlette constraint is permissive (>=0.46.0) and would
+# otherwise stay on the installed 0.46.2, which is missing fixes for
+# several CVEs (including a multipart-upload DoS, CVE-2025-54121) patched
+# in later releases.
+starlette = "^1.7.0"
 uvicorn = {extras = ["standard"], version = "^0.24.0"}
 sqlalchemy = "^2.0.0"
 alembic = "^1.13.0"
