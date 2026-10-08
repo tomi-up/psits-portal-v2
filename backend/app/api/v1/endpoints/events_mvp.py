@@ -248,6 +248,14 @@ async def attendance_updates_ws(
         await websocket.close(code=1008)
         return
 
+    # Mirrors get_current_admin's check - without it, a token revoked by a
+    # password change (which REST endpoints reject immediately via this same
+    # comparison) would keep authenticating to this notification channel
+    # until its own 12-hour expiry.
+    if payload.get("sec") != admin.security_stamp:
+        await websocket.close(code=1008)
+        return
+
     attendance_ws_manager.connect(event_id, websocket)
     await websocket.send_json({"type": "authenticated"})
     try:
