@@ -17,6 +17,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from app.services.excel_safety import safe_cell_value
+
 if TYPE_CHECKING:
     from app.api.v1.endpoints.admin_events import SurveyResultsResponse
 
@@ -106,7 +108,7 @@ def build_survey_results_workbook(data: "SurveyResultsResponse") -> BytesIO:
                 q.responses,
             ]
             for col_idx, value in enumerate(values, start=1):
-                cell = summary_ws.cell(row=row, column=col_idx, value=value)
+                cell = summary_ws.cell(row=row, column=col_idx, value=safe_cell_value(value))
                 cell.border = THIN_BORDER
                 cell.alignment = Alignment(
                     horizontal="left" if col_idx in (1, 2) else "center",
@@ -136,7 +138,7 @@ def build_survey_results_workbook(data: "SurveyResultsResponse") -> BytesIO:
     for c in data.comments:
         values = [c.student_id, c.student_name, c.comment, c.submitted_at.strftime("%B %d, %Y %I:%M %p")]
         for col_idx, value in enumerate(values, start=1):
-            cell = comments_ws.cell(row=row, column=col_idx, value=value)
+            cell = comments_ws.cell(row=row, column=col_idx, value=safe_cell_value(value))
             cell.border = THIN_BORDER
             cell.alignment = Alignment(
                 horizontal="left" if col_idx in (2, 3) else "center", vertical="center", wrap_text=col_idx == 3

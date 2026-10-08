@@ -19,6 +19,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from app.services.excel_safety import safe_cell_value
+
 if TYPE_CHECKING:
     from app.api.v1.endpoints.admin_events import EventRegistrationsResponse
 
@@ -223,7 +225,7 @@ def _write_table(ws: Worksheet, data: "EventRegistrationsResponse", start_row: i
             _to_ph_time_str(r.time_out),
         ]
         for col_idx, value in enumerate(values, start=1):
-            cell = ws.cell(row=row, column=col_idx, value=value)
+            cell = ws.cell(row=row, column=col_idx, value=safe_cell_value(value))
             cell.border = THIN_BORDER
             cell.alignment = Alignment(
                 horizontal="center" if col_idx not in (2, 3, 4) else "left",
