@@ -4,6 +4,7 @@ public posts). The list endpoint is public - it feeds the logged-out landing
 page - while adding/removing links is admin-only."""
 
 from datetime import datetime
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -27,6 +28,15 @@ class NewsCreate(BaseModel):
     facebook_url: str
 
 
+def _is_facebook_url(url: str) -> bool:
+    # Checks the parsed hostname, not a substring: the stored URL is rendered
+    # as a link on the public landing page, so "facebook.com.attacker.example"
+    # or "javascript:...//facebook.com" must not get through.
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and (host == "facebook.com" or host.endswith(".facebook.com"))
+
+
 @router.get("/")
 def list_news(db: Session = Depends(get_db)):
     posts = db.query(NewsPost).order_by(NewsPost.created_at.desc()).all()
@@ -43,7 +53,7 @@ def add_news(body: NewsCreate, db: Session = Depends(get_db)):
     url = body.facebook_url.strip()
     if not url:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="A Facebook post URL is required")
-    if "facebook.com" not in url:
+    if not _is_facebook_url(url):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="That doesn't look like a Facebook URL")
 
     post = NewsPost(facebook_url=url)
